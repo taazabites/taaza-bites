@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Taazabites™ | AI Meal Planner & Healthy Food Delivery in Bangalore</title>
+    
+    <meta content="Get a personalized, macro-optimized meal plan with our AI Planner! TaazaBites offers premium healthy meal delivery in Bangalore. Chef-crafted Keto, High Protein & Vegetarian meals. Order now for a healthier lifestyle." name="description"/>
+    <meta name="keywords" content="healthy food delivery bangalore, meal subscription bangalore, ai meal planner, keto meals, high protein meals, corporate food delivery, taazabites">
+    <meta content="#55B528" name="theme-color"/>
+    <link href="https://taazabites.in/" rel="canonical"/>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+    
+    <!-- Performance & Font Optimization -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://images.unsplash.com">
+    <link rel="preconnect" href="https://cdn.urbanpiper.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1490818387583-1baba5e638af?ixlib=rb-4.0.3&fm=webp&w=1280&q=60" imagesrcset="https://images.unsplash.com/photo-1490818387583-1baba5e638af?ixlib=rb-4.0.3&fm=webp&w=640&q=60 640w, https://images.unsplash.com/photo-1490818387583-1baba5e638af?ixlib=rb-4.0.3&fm=webp&w=1280&q=60 1280w, https://images.unsplash.com/photo-1490818387583-1baba5e638af?ixlib=rb-4.0.3&fm=webp&w=1920&q=60 1920w" imagesizes="100vw">
+
+    <meta content="website" property="og:type"/>
+    <meta content="https://taazabites.in/" property="og:url"/>
+    <meta content="Taazabites™ | AI Meal Planner & Healthy Food Delivery in Bangalore" property="og:title"/>
+    <meta content="Get a personalized meal plan with our new AI Planner! Experience chef-crafted, nutritionist-designed meals delivered to your doorstep in Bangalore." property="og:description"/>
+    <meta content="https://images.unsplash.com/photo-1490818387583-1baba5e638af?ixlib=rb-4.0.3&fm=webp&w=1200&q=50" property="og:image"/>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <style>
+      :root {
+        --primary: #55B528;
+        --primary-light: rgba(85, 181, 40, 0.1);
+        --primary-dark: #2A5B14;
+        --accent: #F7C808;
+        --accent-secondary: #F85D25;
+        --off-white: #FDFDFB;
+        --section-bg-light-green: #F9FCF7;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        background-color: var(--off-white);
+        color: #333;
+        line-height: 1.7;
+        font-family: 'Inter', sans-serif;
+      }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: var(--off-white); }
+      ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+      .font-iowan {
+        font-family: Iowan Old Style, Apple Garamond, Baskerville, Times New Roman, Droid Serif, Times, Source Serif Pro, serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        letter-spacing: -0.02em;
+      }
+      
+      .section-divider {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        overflow: hidden;
+        line-height: 0;
+        transform: rotate(180deg);
+      }
+      .section-divider svg {
+        position: relative;
+        display: block;
+        width: calc(100% + 1.3px);
+        height: 80px;
+      }
+      .section-divider .shape-fill {
+        fill: var(--off-white);
+      }
+      .section-divider.top {
+        top: -1px;
+        bottom: auto;
+        transform: rotate(0);
+      }
+      .section-divider.top .shape-fill {
+         fill: var(--section-bg-light-green);
+      }
+      
+      .meal-plan-loader {
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 3px solid rgba(46, 46, 46, 0.3);
+        border-top-color: #2E2E2E;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .animate-ken-burns {
+        animation: kenBurns 40s ease-in-out infinite alternate;
+      }
+      @keyframes kenBurns {
+        0% { transform: scale(1.05) translate(2%, -2%); }
+        100% { transform: scale(1) translate(0, 0); }
+      }
+
+      /* Form Input Glow */
+      .form-glow input:focus, .form-glow select:focus, .form-glow textarea:focus {
+        box-shadow: 0 0 0 3px rgba(85, 181, 40, 0.4);
+        border-color: var(--primary) !important;
+      }
+      
+      /* Button Ripple Effect */
+      .ripple-effect {
+        position: relative;
+        overflow: hidden;
+      }
+      .ripple-effect .ripple {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.6);
+        transform: scale(0);
+        animation: ripple-animation 0.6s linear;
+        pointer-events: none;
+      }
+      @keyframes ripple-animation {
+        to {
+          transform: scale(4);
+          opacity: 0;
+        }
+      }
+
+      /* Image Loading Optimization */
+      .image-container {
+        background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%);
+        background-size: 200% 100%;
+        animation: 1.5s shine linear infinite;
+        overflow: hidden;
+        position: relative;
+      }
+      @keyframes shine {
+        to {
+          background-position-x: -200%;
+        }
+      }
+      .image-container > img {
+        opacity: 0;
+        transition: opacity 500ms ease-in-out;
+      }
+      .image-container > img.is-loaded {
+        opacity: 1;
+      }
+
+      /* Hide scrollbar for Tailwind carousel-like elements */
+      .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+      }
+      .hide-scrollbar {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+      }
+      
+      /* New Animation System */
+      .animate-on-scroll {
+          opacity: 0;
+          will-change: transform, opacity;
+      }
+
+      @keyframes slide-fade-in-up {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes slide-in-left {
+          from { opacity: 0; transform: translateX(-40px); }
+          to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes slide-in-right {
+          from { opacity: 0; transform: translateX(40px); }
+          to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+      }
+      @keyframes scale-up {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+      }
+
+      .is-visible[data-animation="slide-fade-in-up"] { animation: slide-fade-in-up 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+      .is-visible[data-animation="slide-in-left"] { animation: slide-in-left 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+      .is-visible[data-animation="slide-in-right"] { animation: slide-in-right 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+      .is-visible[data-animation="fade-in"] { animation: fade-in 0.8s cubic-bezier(0.39, 0.575, 0.565, 1) both; }
+      .is-visible[data-animation="scale-up"] { animation: scale-up 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+      
+      /* AI search results styling */
+      .ai-results ul {
+        list-style-type: disc;
+        padding-left: 1.5rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+      }
+      .ai-results li {
+        margin-bottom: 0.5rem;
+      }
+      .ai-results strong {
+        color: var(--primary-dark);
+      }
+    </style>
+    
+    <!-- Premium SEO: JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Restaurant",
+      "name": "Taazabites™",
+      "image": "https://images.unsplash.com/photo-1490818387583-1baba5e638af?ixlib=rb-4.0.3&fm=webp&w=1200&q=50",
+      "url": "https://taazabites.in/",
+      "telephone": "+91-7975771457",
+      "servesCuisine": "Healthy Food",
+      "priceRange": "₹₹",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Kasavanahalli",
+        "addressLocality": "Bengaluru",
+        "postalCode": "560035",
+        "addressRegion": "KA",
+        "addressCountry": "IN"
+      },
+       "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday"
+          ],
+          "opens": "09:00",
+          "closes": "22:00"
+        }
+      ],
+      "menu": "https://taazabites.in/menu",
+      "acceptsReservations": "False",
+      "hasMenu": {
+        "@type": "Menu",
+        "name": "Signature Dishes",
+        "hasMenuItem": [
+          {
+            "@type": "MenuItem",
+            "name": "High Protein Egg Chicken Meal",
+            "description": "Grilled chicken with boiled eggs and seasonal vegetables.",
+            "offers": {
+              "@type": "Offer",
+              "price": "349",
+              "priceCurrency": "INR"
+            }
+          },
+          {
+            "@type": "MenuItem",
+            "name": "Dry Fruit Chia Pudding",
+            "description": "Chia seeds, assorted dry fruits and natural sweeteners.",
+            "offers": {
+              "@type": "Offer",
+              "price": "319",
+              "priceCurrency": "INR"
+            }
+          }
+        ]
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "url": "https://taazabites.in/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://taazabites.in/?s={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [{
+        "@type": "Question",
+        "name": "How does Taazabites ensure meal freshness?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "We prepare all meals daily using locally sourced ingredients and deliver in temperature-controlled packaging to maintain freshness and nutritional value."
+        }
+      },{
+        "@type": "Question",
+        "name": "Do you accommodate dietary restrictions?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes! We offer vegetarian, vegan, gluten-free, and keto options. Please specify your requirements when ordering."
+        }
+      },{
+        "@type": "Question",
+        "name": "What areas in Bangalore do you deliver to?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "We currently deliver to all major areas of Bangalore including Whitefield, Indiranagar, Koramangala, HSR Layout, and surrounding regions."
+        }
+      }]
+    }
+    </script>
+    
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.26.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

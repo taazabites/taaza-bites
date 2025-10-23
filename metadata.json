@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Copy of Taazabites AI Meal Planner",
+  "description": "A mobile-friendly web application for Taazabites, a premium healthy food delivery service in Bangalore. It features a powerful AI-powered meal planner using the Gemini API to generate personalized meal plans, suggest dish alternatives for various dietary needs like keto and high-protein, and provide corporate wellness solutions.",
+  "requestFramePermissions": []
+}
