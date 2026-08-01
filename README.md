@@ -1,176 +1,154 @@
-<p align="center">
-  <img src="apps/landing/public/icons/icon-192x192.png" alt="Taaza Bites" width="96" height="96" />
-</p>
+# Taaza Bites
 
-<h1 align="center">Taaza Bites</h1>
+**Chef-crafted healthy meal subscriptions — delivered fresh across Bengaluru.**
 
-<p align="center">
-  <strong>Multi-app healthy meal subscription platform</strong><br/>
-  Landing · Customer · Admin · Delivery — one monorepo, shared Auth, role-based portals, Gemini AI
-</p>
-
-<p align="center">
-  <a href="https://github.com/iamsunku/Taaza-bites-company"><img src="https://img.shields.io/badge/GitHub-Taaza--bites--company-181717?logo=github" alt="GitHub" /></a>
-  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React" />
-  <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Firebase-Auth%20%2B%20Firestore-FFCA28?logo=firebase&logoColor=black" alt="Firebase" />
-  <img src="https://img.shields.io/badge/AI-Google%20Gemini-8E75B2?logo=google&logoColor=white" alt="Gemini" />
-  <img src="https://img.shields.io/badge/Monorepo-npm%20workspaces-CB3837?logo=npm&logoColor=white" alt="Monorepo" />
-</p>
+Taaza Bites is a multi-application food-tech platform that powers the full subscription lifecycle: acquisition on the marketing site, customer self-serve subscriptions, kitchen and operations control, and last-mile delivery partner execution.
 
 ---
 
-## Why this project
+## Overview
 
-Taaza Bites is a **food-tech product system**, not a single marketing page. Customers subscribe to chef-crafted meals, staff run operations, and delivery partners fulfill routes — each in a dedicated app, connected through one authentication layer and a Super Admin control plane.
+The platform is organized as an **npm workspaces monorepo** with four independently deployable applications that share a common authentication project and role-based entry paths.
 
-Built to demonstrate real-world skills in:
-
-- Full-stack product architecture  
-- Role-based access (RBAC) across multiple apps  
-- Firebase Auth + Firestore data design  
-- Payments & communication integrations  
-- In-product AI with Google Gemini  
-- Clean monorepo packaging for demos and deployment  
-
----
-
-## Apps at a glance
-
-| App | Package | Port | Purpose |
-|-----|---------|------|---------|
-| **Landing** | `@taazabites/landing` | `3002` | Marketing hub, CTAs, Sign-in → portal picker |
-| **Admin** | `@taazabites/admin` | `3001` | Ops console + **Super Admin** (`/super-admin`) |
-| **Customer** | `@taazabites/customer` | `3000` | Subscriptions, meals, wallet, account |
-| **Delivery** | `@taazabites/delivery` | `3003` | Partner deliveries, earnings, profile |
+| Application | Responsibility |
+|-------------|----------------|
+| **Landing** | Public website, SEO surfaces, CTAs, and authenticated portal routing |
+| **Customer** | Subscriptions, meal plans, account, wallet, and self-serve flows |
+| **Admin** | Operations console with RBAC and a Super Admin control plane |
+| **Delivery** | Partner-facing app for assignments, tracking, and earnings |
 
 ```text
 taaza-bites/
 ├── apps/
-│   ├── landing/
-│   ├── admin/
-│   ├── customer/
-│   └── delivery/
-├── package.json          # npm workspaces
-└── README.md
+│   ├── landing/      # Marketing + portal hub
+│   ├── customer/     # Subscriber experience
+│   ├── admin/        # Ops + Super Admin
+│   └── delivery/     # Delivery partner app
+└── package.json      # Workspace root
 ```
 
 ---
 
-## System flow
+## Architecture
+
+### High-level flow
 
 ```mermaid
-flowchart LR
-  L[Landing Hub] --> Auth[Firebase Auth]
-  Auth --> R{Role resolve}
-  R -->|admins / Super Admin| A[Admin App]
-  R -->|approved partner| D[Delivery App]
-  R -->|customer| C[Customer App]
-  R -->|optional| L
-  SA[Super Admin] -->|invite staff| A
-  SA -->|approve partners| D
-  SA -->|portal URLs & flags| L
+flowchart TB
+  subgraph Public
+    L[Landing Website]
+  end
+
+  subgraph Identity
+    FA[Firebase Authentication]
+  end
+
+  subgraph Apps
+    C[Customer App]
+    A[Admin App]
+    D[Delivery Partner App]
+  end
+
+  L -->|Subscribe / Order| C
+  L -->|Staff login| A
+  L -->|Partner login| D
+  L -->|Sign-in + role resolve| FA
+  FA -->|role: customer| C
+  FA -->|role: admin / super admin| A
+  FA -->|approved delivery partner| D
+  A -->|invite staff / approve partners / portal config| FA
 ```
 
-**From the website**
+### Design principles
 
-| User action | Destination |
-|-------------|-------------|
-| Subscribe / Order | Customer app |
-| Sign in | Role check → Admin / Delivery / Customer / Stay |
-| Footer → Staff Login | Admin `/admin/login` |
-| Footer → Delivery Partner | Delivery `/login` |
-| Footer → Customer Login | Customer `/login` |
+- **Separation of concerns** — each persona gets a dedicated app instead of one overloaded SPA  
+- **Shared identity, scoped data** — one Firebase Auth project; domain-specific Firestore databases  
+- **Hub-and-spoke entry** — the landing site is the public front door; deep links and role checks route users correctly  
+- **Least privilege** — delivery partners cannot self-provision; staff require invites; Super Admin owns elevated controls  
 
 ---
 
-## Key features
+## Features
 
-### Portal & identity
-- Shared Firebase Auth across all four apps  
-- Landing post-login **portal picker** with priority: Admin → Delivery → Customer  
-- Optional role API: `GET /api/me` on Admin (with client-side Firestore fallback)  
+### Customer experience
+- Subscription plan discovery and checkout integrations  
+- Meal preferences, schedules, and account management  
+- Wallet / rewards surfaces (product-dependent modules)  
+- Mobile-friendly flows with progressive enhancement  
+
+### Operations (Admin)
+- Orders, kitchen, inventory, subscriptions, finance, and support modules  
+- Role-based access control (e.g. Kitchen Manager, Delivery Manager, Finance, CRM)  
+- Audit-oriented admin workflows and session-aware auth  
 
 ### Super Admin control plane
-- Invite staff → `adminInvites` → claimed as `admins/{uid}` on first login  
-- Approve / block delivery partners on the partner Firestore database  
-- Map customer accounts across CRM ↔ customer app  
-- Configure portal URLs & feature flags in `systemSettings`  
-- UI: `http://localhost:3001/super-admin`  
+- Staff invitations with claim-on-first-login (`adminInvites` → `admins/{uid}`)  
+- Delivery partner registration, approval, and blocking  
+- Cross-app customer account mapping  
+- Runtime portal URL configuration and feature flags  
 
-### Operations & product
-- Kitchen, orders, subscriptions, finance modules (admin)  
-- Customer subscription & meal experience  
-- Delivery partner app (OTP) — **no open self-registration**  
+### Delivery partners
+- Phone OTP authentication  
+- Access gated on an approved partner profile  
+- Deliveries, status updates, and earnings views  
 
-### Integrations
-| Area | Tech |
-|------|------|
+### Platform integrations
+
+| Capability | Provider |
+|------------|----------|
+| Authentication & realtime data | Firebase Auth, Cloud Firestore |
 | Payments | Razorpay |
-| WhatsApp | Gupshup |
-| Email | Brevo / SMTP |
-| Maps | Google Maps Platform |
-| AI | Google Gemini (`@google/genai`) |
+| WhatsApp messaging | Gupshup |
+| Transactional email | Brevo (SMTP / API) |
+| Maps & logistics helpers | Google Maps Platform |
+| Generative AI | Google Gemini |
 
 ---
 
 ## Tech stack
 
-| Layer | Choices |
-|-------|---------|
-| UI | React 19, TypeScript, Vite, Tailwind CSS, Motion |
-| Server | Node.js, Express (landing / admin / customer) |
-| Auth & DB | Firebase Auth, Firestore (named DBs per domain) |
-| AI | Google Gemini |
-| Tooling | npm workspaces monorepo |
+| Layer | Technologies |
+|-------|----------------|
+| Client | React 19, TypeScript, Vite, Tailwind CSS |
+| Server | Node.js, Express (per-app servers where required) |
+| Identity & data | Firebase Auth, Firestore |
+| AI | Google Gemini (`@google/genai`) |
+| Repo layout | npm workspaces (`@taazabites/*` packages) |
+
+**Workspace packages:** `@taazabites/landing` · `@taazabites/customer` · `@taazabites/admin` · `@taazabites/delivery`
 
 ---
 
 ## Getting started
 
-### Prerequisites
-- **Node.js 20+**
-- Firebase project with **Authentication** enabled  
-- Copy `.env.example` → `.env` in each app and fill keys  
+### Requirements
 
-### Install
+- Node.js **20+**
+- npm **10+**
+- A Firebase project with Email/Password and/or Phone Auth enabled  
+- API keys for optional integrations (Razorpay, Gemini, Maps, etc.)
+
+### Install dependencies
 
 ```bash
 cd apps/landing && npm install
-cd ../admin && npm install
 cd ../customer && npm install
+cd ../admin && npm install
 cd ../delivery && npm install
 ```
 
-### Run locally (PowerShell)
+### Environment
 
-```powershell
-# Terminal 1 — Landing
-cd apps/landing; $env:PORT='3002'; npm run dev
+Copy each app’s example env file and fill values:
 
-# Terminal 2 — Admin
-cd apps/admin; $env:PORT='3001'; npm run dev
-
-# Terminal 3 — Customer UI
-cd apps/customer; npx vite --port=3000 --host=0.0.0.0
-
-# Terminal 4 — Delivery
-cd apps/delivery; npm run dev
+```bash
+cp apps/landing/.env.example apps/landing/.env
+cp apps/customer/.env.example apps/customer/.env
+cp apps/admin/.env.example apps/admin/.env
+cp apps/delivery/.env.example apps/delivery/.env
 ```
 
-### Local URLs
-
-| App | URL |
-|-----|-----|
-| Landing | http://localhost:3002 |
-| Admin login | http://localhost:3001/admin/login |
-| Super Admin | http://localhost:3001/super-admin |
-| Customer | http://localhost:3000 |
-| Delivery | http://localhost:3003 |
-
-### Landing portal env
-
-`apps/landing/.env`:
+**Landing portal wiring** (`apps/landing/.env`):
 
 ```env
 VITE_CUSTOMER_URL=http://localhost:3000
@@ -180,7 +158,33 @@ VITE_LANDING_URL=http://localhost:3002
 VITE_ROLE_API_URL=http://localhost:3001/api/me
 ```
 
-### Root workspace scripts
+**Admin server (optional but recommended for Super Admin APIs):**
+
+```env
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
+```
+
+### Run development servers
+
+| App | Command | URL |
+|-----|---------|-----|
+| Landing | `cd apps/landing && PORT=3002 npm run dev` | http://localhost:3002 |
+| Admin | `cd apps/admin && PORT=3001 npm run dev` | http://localhost:3001 |
+| Customer | `cd apps/customer && npx vite --port=3000 --host=0.0.0.0` | http://localhost:3000 |
+| Delivery | `cd apps/delivery && npm run dev` | http://localhost:3003 |
+
+Windows PowerShell examples:
+
+```powershell
+cd apps/landing; $env:PORT='3002'; npm run dev
+cd apps/admin;   $env:PORT='3001'; npm run dev
+cd apps/customer; npx vite --port=3000 --host=0.0.0.0
+cd apps/delivery; npm run dev
+```
+
+From the monorepo root (after workspace install):
 
 ```bash
 npm run dev:landing
@@ -191,69 +195,59 @@ npm run dev:delivery
 
 ---
 
-## Super Admin setup
+## Role model
 
-1. Open [Admin login](http://localhost:3001/admin/login)  
-2. Sign in with a Firebase user that is allowlisted for Super Admin bootstrap  
-3. First successful login creates `admins/{uid}` with role **Super Admin**  
-4. Invite staff from **Admin Management**  
-5. Approve partners & set portals under **Super Admin**  
+| Persona | How access is granted | Primary app |
+|---------|----------------------|-------------|
+| Customer | Self-serve signup / login | Customer |
+| Delivery partner | Super Admin registers & approves profile | Delivery |
+| Staff (Kitchen, Ops, Finance, …) | Super Admin invite → first login claims profile | Admin |
+| Super Admin | Bootstrap allowlist + `admins/{uid}` | Admin (`/super-admin`) |
 
-> Passwords are stored only in **Firebase Auth** — none are hardcoded in this repository.
-
-For full Admin server APIs (`/api/me`, partner dual-write), add a service account to `apps/admin/.env`:
-
-```env
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@....iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-```
-
-Deploy `apps/admin/firestore.rules` to Firebase before production.
+Staff invites are stored under `adminInvites` and materialized as `admins/{uid}` when the user authenticates for the first time. Delivery partners without an approved `deliveryPartners/{uid}` document are rejected at the gate.
 
 ---
 
-## Security highlights
+## API surface (Admin)
 
-- `.env` and secrets are gitignored  
-- Delivery access requires an approved `deliveryPartners/{uid}` document  
-- Admin access requires `admins/{uid}` (or invite claim / Super Admin allowlist)  
-- Role checks span Auth + Firestore; partner self-signup is disabled by design  
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/me` | Authenticated role + portal resolution (Bearer Firebase ID token) |
+| `GET/PUT /api/super-admin/portals` | Portal URLs & feature flags |
+| `GET/POST/PATCH /api/super-admin/partners` | Partner list / register / block |
+| `GET/POST /api/super-admin/customer-map` | Link customer identities across systems |
 
----
-
-## Demo script (portfolio / interviews)
-
-1. **Landing** → Subscribe → Customer app  
-2. **Sign in** → portal picker by role  
-3. **Admin** → Super Admin → register a delivery partner  
-4. **Delivery** → OTP login (only after approval)  
-5. Show one **Gemini AI** flow inside the product  
+When Firebase Admin credentials are missing, role resolution falls back to client-side Firestore reads from the landing app.
 
 ---
 
-## Project status
+## Security
 
-| Area | Status |
-|------|--------|
-| Monorepo layout | Done |
-| Portal linking (Phase 1) | Done |
-| Role-based login routing (Phase 2) | Done |
-| Gates + `/api/me` (Phase 3) | Done |
-| Super Admin hub (Phase 4) | Done |
-| Single shared Firestore DB | Optional / future |
-| Cross-domain SSO cookies | Optional / future |
+- Secrets (`.env`, private keys) are excluded via `.gitignore`  
+- Firestore security rules enforce admin/partner ownership and Super Admin writes  
+- Delivery self-registration is disabled by product policy  
+- Production deployments should publish `apps/admin/firestore.rules` (and related app rules) to Firebase  
 
 ---
 
-## Author
+## Roadmap (optional)
 
-Built and documented as a full-stack / AI product case study.
+- [ ] Unify named Firestore databases into a single shared data plane  
+- [ ] Cross-subdomain SSO session sharing for production domains  
+- [ ] Expanded automated test coverage across workspace packages  
+- [ ] CI pipelines for lint, typecheck, and build per app  
 
-- GitHub: [iamsunku/Taaza-bites-company](https://github.com/iamsunku/Taaza-bites-company)
+---
+
+## Contributing
+
+1. Create a feature branch from `main`  
+2. Keep changes scoped to the relevant `apps/*` package when possible  
+3. Do not commit credentials or production service accounts  
+4. Open a pull request with a clear summary and test notes  
 
 ---
 
 ## License
 
-Private / proprietary unless the repository owner states otherwise.
+Proprietary. All rights reserved unless otherwise specified by the repository owner.
