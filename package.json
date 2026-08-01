@@ -1,0 +1,23 @@
+{
+  "name": "taaza-bites",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Taaza Bites monorepo — landing, admin, customer, delivery partner",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:landing": "npm run dev -w @taazabites/landing",
+    "dev:admin": "npm run dev -w @taazabites/admin",
+    "dev:customer": "npm run dev -w @taazabites/customer",
+    "dev:delivery": "npm run dev -w @taazabites/delivery",
+    "dev:customer:ui": "npm exec -w @taazabites/customer -- vite --port=3000 --host=0.0.0.0",
+    "build:landing": "npm run build -w @taazabites/landing",
+    "build:admin": "npm run build -w @taazabites/admin",
+    "build:customer": "npm run build -w @taazabites/customer",
+    "build:delivery": "npm run build -w @taazabites/delivery"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

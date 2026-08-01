@@ -1,0 +1,4 @@
+sed -i 's/const caloriesPercent = 65; \/\/ Simulated active calorie completion/const consumedCalories = todayMeals.reduce((acc, meal) => acc + Number(meal.calories || 0), 0);\n  const caloriesPercent = targetCalories > 0 ? Math.min(100, Math.round((consumedCalories \/ targetCalories) * 100)) : 0;/g' src/pages/Dashboard.tsx
+sed -i 's/const proteinPercent = 58;  \/\/ Simulated active protein consumption/const consumedProtein = todayMeals.reduce((acc, meal) => acc + Number(meal.protein || 0), 0);\n  const proteinPercent = targetProtein > 0 ? Math.min(100, Math.round((consumedProtein \/ targetProtein) * 100)) : 0;/g' src/pages/Dashboard.tsx
+sed -i 's/value={`${1100}\/${targetCalories} kcal`}/value={`${consumedCalories}\/${targetCalories} kcal`}/g' src/pages/Dashboard.tsx
+sed -i 's/value={`${75}\/${targetProtein}g`}/value={`${consumedProtein}\/${targetProtein}g`}/g' src/pages/Dashboard.tsx

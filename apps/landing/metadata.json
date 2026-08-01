@@ -1,0 +1,10 @@
+{
+  "name": "Taazabites Hospitality Pvt Ltd",
+  "description": "Taazabites is Bengaluru's premier healthy Indian diet meal delivery service. We provide dietitian-approved, macro-calculated gourmet meals delivered fresh in eco-friendly food containers for weight loss, muscle gain, and wellness.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,381 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny catch-all safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasAnyRole(rolesList) {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('role', '') in rolesList;
+    }
+
+    // Explicit Role Helpers
+    function isSuperAdmin() {
+      let isOwner = isSignedIn() && 'email' in request.auth.token && (request.auth.token.email == '143bhosur@gmail.com' || request.auth.token.email == 'admin@taazabites.in');
+      return isOwner || hasAnyRole(['Super Admin', 'superAdmin']);
+    }
+
+    function isAdmin() {
+      return isSuperAdmin() || hasAnyRole(['Admin', 'admin']);
+    }
+
+    function isOperationsManager() {
+      return isAdmin() || hasAnyRole(['Operations Manager']);
+    }
+
+    function isKitchenManager() {
+      return isAdmin() || hasAnyRole(['Kitchen Manager']);
+    }
+
+    function isKitchenStaff() {
+      return isKitchenManager() || hasAnyRole(['Kitchen Staff']);
+    }
+
+    function isDeliveryManager() {
+      return isAdmin() || hasAnyRole(['Delivery Manager']);
+    }
+
+    function isDeliveryPartner() {
+      return isDeliveryManager() || hasAnyRole(['Delivery Partner']);
+    }
+
+    function isFinanceManager() {
+      return isAdmin() || hasAnyRole(['Finance Manager']);
+    }
+
+    function isMarketingManager() {
+      return isAdmin() || hasAnyRole(['Marketing Manager']);
+    }
+
+    function isCRMExecutive() {
+      return isOperationsManager() || hasAnyRole(['CRM Executive']);
+    }
+
+    function isSupportExecutive() {
+      return isOperationsManager() || hasAnyRole(['Support Executive']);
+    }
+
+    function isInventoryManager() {
+      return isKitchenManager() || hasAnyRole(['Inventory Manager']);
+    }
+
+    function isAnalyticsViewer() {
+      return isAdmin() || hasAnyRole(['Analytics Viewer', 'Read Only Auditor']);
+    }
+
+    function isReadOnlyAuditor() {
+      return hasAnyRole(['Read Only Auditor']);
+    }
+
+    // 1. Admins Collection
+    // Own-doc read lets landing/portal role resolver + login gate work for staff.
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow write: if isSuperAdmin();
+    }
+
+    // Staff invites — claimed as admins/{uid} on first login
+    match /adminInvites/{inviteId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /systemSettings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /customerAccountMaps/{mapId} {
+      allow read: if isAdmin();
+      allow write: if isSuperAdmin();
+    }
+
+    // 2. Customers
+    match /customers/{customerId} {
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == customerId || isOperationsManager() || isCRMExecutive() || isSupportExecutive() || isAnalyticsViewer());
+      allow write: if isAdmin() || isOperationsManager() || isCRMExecutive() || (isSignedIn() && request.auth.uid == customerId);
+    }
+
+    // 3. Customer Addresses & Notes
+    match /customerAddresses/{addressId} {
+      allow read: if isAdmin() || isOperationsManager() || isCRMExecutive() || isSupportExecutive() || isAnalyticsViewer();
+      allow write: if isAdmin() || isOperationsManager() || isCRMExecutive() || isSupportExecutive();
+    }
+    match /customerNotes/{noteId} {
+      allow read: if isAdmin() || isOperationsManager() || isCRMExecutive() || isSupportExecutive() || isAnalyticsViewer();
+      allow write: if isAdmin() || isOperationsManager() || isCRMExecutive() || isSupportExecutive();
+    }
+
+    // 4. Orders
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (isAdmin() || (resource != null && resource.data.customerId == request.auth.uid) || isOperationsManager() || isKitchenStaff() || isDeliveryPartner() || isAnalyticsViewer());
+      allow write: if isAdmin() || isOperationsManager() || isKitchenStaff() || isDeliveryPartner() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
+    }
+
+    // 5. Subscriptions & Plans
+    match /subscriptions/{subId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || isOperationsManager() || isCRMExecutive() || isAnalyticsViewer());
+      allow write: if isAdmin() || isOperationsManager() || isCRMExecutive();
+    }
+    match /subscriptionPlans/{planId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 6. Audit Logs
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if isSignedIn();
+    }
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if isSignedIn();
+    }
+
+    // 7. Meals & Menu
+    match /meals/{mealId} {
+      allow read: if true;
+      allow write: if isAdmin() || isKitchenManager();
+    }
+    match /menu/{mealId} {
+      allow read: if true;
+      allow write: if isAdmin() || isKitchenManager();
+    }
+    match /menuItems/{mealId} {
+      allow read: if true;
+      allow write: if isAdmin() || isKitchenManager();
+    }
+
+    // 8. Coupons
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin() || isMarketingManager();
+    }
+
+    // 9. Service Areas
+    match /serviceAreas/{areaId} {
+      allow read: if true;
+      allow write: if isAdmin() || isDeliveryManager();
+    }
+
+    // 10. Delivery Partners & Routes
+    match /deliveryPartners/{partnerId} {
+      allow read: if isAdmin() || isDeliveryManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isDeliveryManager();
+    }
+    match /deliveryRoutes/{routeId} {
+      allow read: if isAdmin() || isDeliveryManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isDeliveryManager();
+    }
+
+    // 11. Banners & Offers
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin() || isMarketingManager();
+    }
+    match /offers/{offerId} {
+      allow read: if true;
+      allow write: if isAdmin() || isMarketingManager();
+    }
+
+    // 12. Notifications (Bulk & Standard Logs)
+    match /notifications/{notifId} {
+      allow read: if true;
+      allow write: if isAdmin() || isMarketingManager();
+    }
+
+    // 13. Transactions, Payments, Refunds, & Invoices
+    match /transactions/{txnId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || isFinanceManager() || isAnalyticsViewer());
+      allow write: if isAdmin() || isFinanceManager();
+    }
+    match /reward_transactions/{txnId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || isFinanceManager() || isAnalyticsViewer());
+      allow write: if isAdmin() || isFinanceManager() || isSuperAdmin();
+    }
+    match /rewardTransactions/{txnId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || isFinanceManager() || isAnalyticsViewer());
+      allow write: if isAdmin() || isFinanceManager() || isSuperAdmin();
+    }
+    match /rewardPoints/{id} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || isFinanceManager() || isAnalyticsViewer());
+      allow write: if isAdmin() || isFinanceManager() || isSuperAdmin();
+    }
+    match /payments/{paymentId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || isFinanceManager() || isAnalyticsViewer());
+      allow write: if isAdmin() || isFinanceManager();
+    }
+    match /refunds/{refundId} {
+      allow read: if isSignedIn() && (isAdmin() || isFinanceManager() || isAnalyticsViewer());
+      allow write: if isAdmin() || isFinanceManager();
+    }
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || isFinanceManager() || isAnalyticsViewer());
+      allow write: if isAdmin() || isFinanceManager();
+    }
+
+    // 14. Inventory & Ingredients
+    match /inventory/{itemId} {
+      allow read, write: if isAdmin() || isInventoryManager();
+    }
+    match /ingredients/{id} {
+      allow read: if isAdmin() || isInventoryManager() || isKitchenStaff() || isAnalyticsViewer();
+      allow write: if isAdmin() || isInventoryManager();
+    }
+    match /stockMovements/{id} {
+      allow read: if isAdmin() || isInventoryManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isInventoryManager() || isKitchenStaff();
+    }
+    match /purchaseOrders/{id} {
+      allow read: if isAdmin() || isInventoryManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isInventoryManager();
+    }
+    match /suppliers/{id} {
+      allow read: if isAdmin() || isInventoryManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isInventoryManager();
+    }
+    match /inventoryAlerts/{id} {
+      allow read: if isAdmin() || isInventoryManager() || isKitchenStaff() || isAnalyticsViewer();
+      allow write: if isAdmin() || isInventoryManager();
+    }
+
+    // 15. Staff
+    match /staff/{staffId} {
+      allow read: if isAdmin() || isOperationsManager() || isKitchenManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isOperationsManager() || isKitchenManager();
+    }
+
+    // 16. Kitchen Production, Recipes, Tasks
+    match /kitchenQueue/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /packing/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /kitchenProduction/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isKitchenStaff();
+    }
+    match /recipeTemplates/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isKitchenManager();
+    }
+    match /kitchenTasks/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isKitchenStaff();
+    }
+
+    // 17. Admin Sessions & Security Events
+    match /adminSessions/{id} {
+      allow read: if isSuperAdmin() || isReadOnlyAuditor();
+      allow write: if isSignedIn();
+    }
+    match /securityEvents/{id} {
+      allow read: if isSuperAdmin() || isReadOnlyAuditor();
+      allow write: if isSignedIn();
+    }
+    match /performanceLogs/{id} {
+      allow read: if isSuperAdmin() || isReadOnlyAuditor();
+      allow write: if true;
+    }
+    match /errorLogs/{id} {
+      allow read: if isSuperAdmin() || isReadOnlyAuditor();
+      allow write: if true;
+    }
+
+    // 18. Support Tickets & Agents
+    match /supportTickets/{id} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || isSupportExecutive() || isAnalyticsViewer());
+      allow write: if isAdmin() || isSupportExecutive() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
+    }
+    match /ticketReplies/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /supportAgents/{id} {
+      allow read: if isAdmin() || isSupportExecutive() || isAnalyticsViewer();
+      allow write: if isAdmin() || isSupportExecutive();
+    }
+    match /knowledgeBase/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isSupportExecutive();
+    }
+
+    // 19. Gateway Settings & generic settings
+    match /systemSettings/gatewayConfiguration {
+      allow read: if isAdmin() || isReadOnlyAuditor();
+      allow write: if isSuperAdmin();
+    }
+    match /settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 20. Campaigns, Segmenting, Comms
+    match /campaigns/{id} {
+      allow read: if isAdmin() || isMarketingManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isMarketingManager();
+    }
+    match /messageTemplates/{id} {
+      allow read: if isAdmin() || isMarketingManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isMarketingManager();
+    }
+    match /communicationLogs/{id} {
+      allow read: if isAdmin() || isMarketingManager() || isAnalyticsViewer();
+      allow write: if isSignedIn();
+    }
+    match /customerConversations/{id} {
+      allow read: if isAdmin() || isCRMExecutive() || isSupportExecutive() || isAnalyticsViewer();
+      allow write: if isAdmin() || isCRMExecutive() || isSupportExecutive();
+    }
+    match /customerSegments/{id} {
+      allow read: if isAdmin() || isMarketingManager() || isCRMExecutive() || isAnalyticsViewer();
+      allow write: if isAdmin() || isMarketingManager() || isCRMExecutive();
+    }
+    match /branches/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /kitchens/{kitchenId} {
+      allow read, write: if isSignedIn();
+    }
+    match /franchises/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /whatsappLogs/{id} {
+      allow read: if isAdmin();
+      allow write: if true;
+    }
+
+    // 21. Deliveries
+    match /deliveries/{deliveryId} {
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        isOperationsManager() ||
+        isDeliveryPartner() ||
+        isDeliveryManager() ||
+        isAnalyticsViewer() ||
+        (resource != null && resource.data.customerId == request.auth.uid)
+      );
+      allow write: if isAdmin() || isOperationsManager() || isDeliveryPartner() || isDeliveryManager() || (
+        isSignedIn() && request.resource.data.customerId == request.auth.uid
+      );
+    }
+
+    // 22. Branch Managers
+    match /branchManagers/{managerId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isOperationsManager();
+    }
+
+    // 23. AI Predictions
+    match /aiPredictions/{predictionId} {
+      allow read: if isSignedIn() && (isAdmin() || isOperationsManager() || isAnalyticsViewer());
+      allow write: if isAdmin();
+    }
+  }
+}

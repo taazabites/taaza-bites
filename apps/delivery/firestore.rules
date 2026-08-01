@@ -1,0 +1,80 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Roles: admin, kitchen, deliveryPartner, crm, customer
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isPartner() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/deliveryPartners/$(request.auth.uid));
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /deliveryPartners/{partnerId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(partnerId);
+    }
+
+    match /deliveryAssignments/{assignmentId} {
+      allow read: if isPartner();
+      allow write: if isPartner();
+    }
+    
+    match /deliveryTracking/{trackingId} {
+      allow read: if isAuthenticated();
+      allow write: if isPartner();
+    }
+    
+    match /deliveryAttendance/{attendanceId} {
+      allow read: if isPartner();
+      allow write: if isPartner();
+    }
+    
+    match /deliveryStatus/{statusId} {
+      allow read: if isAuthenticated();
+      allow write: if isPartner();
+    }
+    
+    match /deliveryProofs/{proofId} {
+      allow read: if isAuthenticated();
+      allow write: if isPartner();
+    }
+    
+    match /deliveryRatings/{ratingId} {
+      allow read: if isAuthenticated();
+      allow write: if isPartner(); // Partners can read their own, assuming filtering
+    }
+    
+    match /deliveryIssues/{issueId} {
+      allow read: if isPartner();
+      allow write: if isPartner();
+    }
+    
+    match /deliveryVehicles/{vehicleId} {
+      allow read: if isPartner();
+      allow write: if isOwner(vehicleId);
+    }
+    
+    match /deliveryDocuments/{documentId} {
+      allow read: if isPartner();
+      allow write: if isOwner(documentId);
+    }
+    
+    match /deliverySettlements/{settlementId} {
+      allow read: if isPartner();
+      allow write: if isOwner(settlementId);
+    }
+    
+    match /notifications/{notificationId} {
+      allow read: if isPartner();
+      allow write: if false; // Assuming admins write notifications
+    }
+  }
+}

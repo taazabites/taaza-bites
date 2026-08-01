@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply font-sans antialiased text-zinc-900 bg-zinc-50 font-semibold;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-black tracking-tight text-zinc-950;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+}
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Outfit", "Sora", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", sans-serif;
+  --font-handwriting: "Caveat", cursive;
+  --font-mono: "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+  
+  --color-primary: #10b981;
+  --color-primary-light: #34d399;
+  --color-primary-dark: #064e3b;
+  --color-emerald-50: #f0fdf4;
+  --color-emerald-600: #059669;
+  
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+  
+  --shadow-premium: 0 4px 30px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --shadow-premium-lg: 0 12px 40px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.03);
+  --shadow-premium-xl: 0 20px 50px rgba(16, 185, 129, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03);
+  --shadow-premium-amber: 0 20px 50px rgba(245, 158, 11, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03);
+  --shadow-glow: 0 0 20px rgba(16, 185, 129, 0.15);
+  --shadow-mega: 0 35px 100px -20px rgba(0, 0, 0, 0.2), 0 10px 40px -15px rgba(0, 0, 0, 0.1);
+  
+  --animate-spin-slow: spin 20s linear infinite;
+}
+
+@layer base {
+  html, body {
+    /* Standard overscroll behavior for better UX */
+    overscroll-behavior-y: auto;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: clip;
+    overflow-y: auto;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-x: clip;
+  }
+  
+  body {
+    @apply font-sans antialiased text-slate-900 bg-slate-50/50 selection:bg-emerald-100 selection:text-emerald-900;
+  }
+  
+  /* Smooth scroll */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom modern scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+  }
+}
+
+@layer utilities {
+  .hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+    -webkit-overflow-scrolling: touch;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mobile Safe Area Padding Utilities */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Smooth Momentum Scrolling for Mobile Horizontals */
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+
+  .no-select {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Single Consolidated Glassmorphism Class */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+
+  :is(.dark .glass-panel) {
+    background: rgba(15, 23, 42, 0.82);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Premium Border Glows */
+  .border-glow-hover {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .border-glow-hover:hover {
+    border-color: rgba(16, 185, 129, 0.3);
+    box-shadow: 0 0 25px rgba(16, 185, 129, 0.08);
+  }
+
+  /* Ripple & Spring Interaction helpers */
+  .spring-interactive {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, filter 0.3s ease;
+  }
+  .spring-interactive:hover {
+    transform: translateY(-2px) scale(1.01);
+  }
+  .spring-interactive:active {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  .tracking-tightest {
+    letter-spacing: -0.06em;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 99px;
+  }
+  .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+  }
+  :is(.dark .custom-scrollbar)::-webkit-scrollbar-thumb {
+    background: #334155;
+  }
+  :is(.dark .custom-scrollbar:hover)::-webkit-scrollbar-thumb {
+    background: #475569;
+  }
+}

@@ -1,0 +1,285 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Core account and authentication metadata.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["customer", "admin", "delivery", "kitchen", "nutritionist", "support"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "role", "status"]
+    },
+    "CustomerProfile": {
+      "title": "Customer Profile",
+      "description": "Public and private profile data for customers.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "bio": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CustomerPreference": {
+      "title": "Customer Preference",
+      "description": "User preferences like diet types and delivery timings.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "dietType": { "type": "string" },
+        "deliverySlot": { "type": "string" },
+        "notificationSettings": { "type": "object" }
+      }
+    },
+    "HealthAssessment": {
+      "title": "Health Assessment",
+      "description": "Initial and recurring health data points.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "age": { "type": "integer" },
+        "gender": { "type": "string" },
+        "height": { "type": "number" },
+        "weight": { "type": "number" },
+        "goal": { "type": "string" },
+        "activityLevel": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "BodyMetric": {
+      "title": "Body Metric",
+      "description": "Periodic logs of weight, fat %, etc.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "weight": { "type": "number" },
+        "bmi": { "type": "number" },
+        "bodyFat": { "type": "number" },
+        "loggedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "SubscriptionPlan": {
+      "title": "Subscription Plan",
+      "description": "Available subscription offerings.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "durationDays": { "type": "integer" },
+        "mealsPerDay": { "type": "integer" },
+        "active": { "type": "boolean" }
+      }
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "Active user subscription instance.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "planId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "paused", "expired", "cancelled"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" }
+      }
+    },
+    "MealItem": {
+      "title": "Meal Item",
+      "description": "A specific food item/dish.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "calories": { "type": "number" },
+        "protein": { "type": "number" },
+        "carbs": { "type": "number" },
+        "fat": { "type": "number" },
+        "active": { "type": "boolean" }
+      }
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Daily meal delivery instance.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "subscriptionId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["scheduled", "preparing", "dispatched", "delivered", "skipped"] }
+      }
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Financial transaction record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Wallet": {
+      "title": "Wallet",
+      "description": "User balance information.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "balance": { "type": "number" }
+      }
+    },
+    "RewardPoints": {
+      "title": "Reward Points",
+      "description": "User loyalty points.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "points": { "type": "number" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app alert.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" }
+      }
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "Customer support request.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "subject": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "resolved", "closed"] }
+      }
+    },
+    "AnalyticsEvent": {
+      "title": "Analytics Event",
+      "description": "Tracking event for business intelligence.",
+      "type": "object",
+      "properties": {
+        "eventName": { "type": "string" },
+        "userId": { "type": "string" },
+        "params": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Address": {
+      "title": "Address",
+      "description": "User delivery address.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Home", "Work", "Other"] },
+        "addressLine1": { "type": "string" },
+        "addressLine2": { "type": "string" },
+        "area": { "type": "string" },
+        "pincode": { "type": "string" },
+        "landmark": { "type": "string" },
+        "isDefault": { "type": "boolean" }
+      },
+      "required": ["userId", "addressLine1", "area", "pincode"]
+    },
+    "AICache": {
+      "title": "AI Cache",
+      "description": "Cache for AI generated content to reduce API calls and latency.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "motivationTip": { "type": "string" },
+        "goal": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date", "motivationTip"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Core auth and role data."
+    },
+    "/customerProfiles/{userId}": {
+      "schema": "CustomerProfile",
+      "description": "Customer profile details."
+    },
+    "/customerPreferences/{userId}": {
+      "schema": "CustomerPreference",
+      "description": "Customer taste and delivery preferences."
+    },
+    "/customerAddresses/{addressId}": {
+      "schema": "Address",
+      "description": "Customer shipping addresses."
+    },
+    "/healthAssessments/{assessmentId}": {
+      "schema": "HealthAssessment",
+      "description": "Health assessment results."
+    },
+    "/bodyMetrics/{metricId}": {
+      "schema": "BodyMetric",
+      "description": "Periodic health logs."
+    },
+    "/subscriptionPlans/{planId}": {
+      "schema": "SubscriptionPlan",
+      "description": "Product catalog."
+    },
+    "/subscriptions/{subId}": {
+      "schema": "Subscription",
+      "description": "User subscriptions."
+    },
+    "/mealItems/{mealId}": {
+      "schema": "MealItem",
+      "description": "Food catalog."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Daily delivery logs."
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payment logs."
+    },
+    "/wallets/{userId}": {
+      "schema": "Wallet",
+      "description": "User balances."
+    },
+    "/rewardPoints/{userId}": {
+      "schema": "RewardPoints",
+      "description": "Loyalty points."
+    },
+    "/notifications/{notifId}": {
+      "schema": "Notification",
+      "description": "In-app alerts."
+    },
+    "/emailQueue/{jobId}": {
+      "schema": "object",
+      "description": "Outbound email jobs."
+    },
+    "/smsQueue/{jobId}": {
+      "schema": "object",
+      "description": "Outbound SMS jobs."
+    },
+    "/tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Support tickets."
+    },
+    "/events/{eventId}": {
+      "schema": "AnalyticsEvent",
+      "description": "Raw analytics events."
+    },
+    "/aiCache/{cacheId}": {
+      "schema": "AICache",
+      "description": "Cached AI generated tips and content."
+    }
+  }
+}

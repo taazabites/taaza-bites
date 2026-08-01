@@ -1,0 +1,320 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn();
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isPublic() {
+      return true;
+    }
+
+    match /_health_check/{document=**} {
+      allow read: if request.auth != null || true; // explicit intention
+    }
+
+    // Collections
+    match /users/{userId} {
+      allow read, write: if true;
+      
+      match /dailyMeals/{mealId} {
+        allow read, write: if true;
+      }
+
+      match /sessions/{sessionId} {
+        allow read, write: if true;
+      }
+    }
+
+    match /customers/{customerId} {
+      allow read, write: if true;
+    }
+
+    match /customerProfiles/{userId} {
+      allow read, write: if true;
+    }
+
+    match /customerPreferences/{userId} {
+      allow read, write: if true;
+    }
+
+    match /customerAddresses/{addressId} {
+      allow read, write: if true;
+    }
+
+    match /addresses/{addressId} {
+      allow read, write: if true;
+    }
+
+    match /healthAssessments/{assessmentId} {
+      allow read, write: if true;
+    }
+
+    match /bodyMetrics/{metricId} {
+      allow read, write: if true;
+    }
+
+    match /mealSchedules/{scheduleId} {
+      allow read, write: if true;
+    }
+
+    match /healthProgress/{progressId} {
+      allow read, write: if true;
+    }
+
+    match /subscriptionPlans/{planId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /mealItems/{mealId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /meals/{mealId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /mealPlans/{planId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /serviceAreas/{areaId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /subscriptions/{subId} {
+      allow read, write: if true;
+    }
+
+    match /subscriptionDrafts/{draftId} {
+      allow read, write: if true;
+    }
+
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    match /deliveries/{deliveryId} {
+      allow read, write: if true;
+    }
+
+    match /kitchenQueue/{itemId} {
+      allow read, write: if true;
+    }
+
+    match /payments/{paymentId} {
+      allow read, write: if true;
+    }
+
+    match /wallets/{userId} {
+      allow read, write: if true;
+    }
+
+    match /rewardPoints/{userId} {
+      allow read, write: if true;
+    }
+
+    match /notifications/{notifId} {
+      allow read, write: if true;
+    }
+
+    match /pushNotifications/{notifId} {
+      allow read, write: if true;
+    }
+
+    match /tickets/{ticketId} {
+      allow read, write: if true;
+    }
+
+    match /supportTickets/{ticketId} {
+      allow read, write: if true;
+    }
+
+    match /feedback/{feedbackId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+    }
+
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /analyticsEvents/{eventId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /emailQueue/{jobId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /smsQueue/{jobId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /calendarMonths/{monthId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /dailyMeals/{mealId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /mealReviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    match /customerReviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    match /emailLogs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /whatsappLogs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /auditLogs/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /marketingCampaigns/{campaignId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /referrals/{referralId} {
+      allow read: if isSignedIn() && (resource.data.referrerUserId == request.auth.uid || resource.data.referredUserId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /referralRewards/{rewardId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /referralCodes/{codeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /dailyCheckins/{checkinId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /deliveryRequests/{requestId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /faqs/{faqId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /mealAnalytics/{analyticsId} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+    }
+
+    match /mealCustomizations/{customId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /nutritionReports/{reportId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /pauseRequests/{requestId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /subscriptionChanges/{changeId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /weightLogs/{logId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    match /refunds/{refundId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /rewardTransactions/{transactionId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    match /walletTransactions/{transactionId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+    match /aiCache/{cacheId} {
+      allow read, write: if isSignedIn() && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid || isAdmin());
+    }
+  }
+}

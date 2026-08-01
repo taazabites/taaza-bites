@@ -1,0 +1,6 @@
+{
+  "name": "TaazaBites Admin Terminal",
+  "description": "Admin dashboard and operations terminal for TaazaBites meal subscriptions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

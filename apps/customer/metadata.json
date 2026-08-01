@@ -1,0 +1,6 @@
+{
+  "name": "TaazaBites",
+  "description": "Chef-curated fresh healthy meals delivered daily in Bengaluru. Tailored to your fitness goals with zero seed oils.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

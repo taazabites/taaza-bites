@@ -1,0 +1,334 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with rewards, diet type, health goal, food dislikes, allergies, and orders",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Unique identifier of the user matching request.auth.uid"
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's full name or screen name"
+        },
+        "diet": {
+          "type": "string",
+          "enum": ["veg", "nonVeg", "none"],
+          "description": "User's diet preference"
+        },
+        "goal": {
+          "type": "string",
+          "enum": ["weight-loss", "hypertrophy", "maintenance"],
+          "description": "User's primary health goal"
+        },
+        "dislikes": {
+          "type": "array",
+          "description": "List of food ingredients or items the user dislikes"
+        },
+        "allergies": {
+          "type": "array",
+          "description": "List of allergies or dietary restrictions (e.g. Nut allergy, No onions)"
+        },
+        "rewardPoints": {
+          "type": "number",
+          "description": "Current reward points of the user"
+        },
+        "rewardTier": {
+          "type": "string",
+          "enum": ["Bronze", "Silver", "Gold", "Platinum"],
+          "description": "Reward membership tier"
+        }
+      },
+      "required": ["uid", "email", "displayName", "diet", "goal"]
+    },
+    "FaqSearch": {
+      "title": "FaqSearch",
+      "description": "Logs search query terms for FAQ analytics",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The search query typed by the user"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of when search occurred"
+        },
+        "resultsCount": {
+          "type": "number",
+          "description": "Number of FAQ items found for this query"
+        }
+      },
+      "required": ["query", "timestamp", "resultsCount"]
+    },
+    "FaqFeedback": {
+      "title": "FaqFeedback",
+      "description": "Logs helpful or not helpful click reviews for FAQs",
+      "type": "object",
+      "properties": {
+        "questionId": {
+          "type": "string",
+          "description": "The ID of the FAQ item"
+        },
+        "questionText": {
+          "type": "string",
+          "description": "The text of the FAQ question"
+        },
+        "helpful": {
+          "type": "boolean",
+          "description": "Whether the user found the answer helpful"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the feedback"
+        }
+      },
+      "required": ["questionId", "questionText", "helpful", "timestamp"]
+    },
+    "VitalityLog": {
+      "title": "VitalityLog",
+      "description": "Daily hydration and activity tracking data for a user",
+      "type": "object",
+      "properties": {
+        "waterIntake": {
+          "type": "number",
+          "description": "Water logged in ml"
+        },
+        "steps": {
+          "type": "number",
+          "description": "Steps walked"
+        },
+        "activeMinutes": {
+          "type": "number",
+          "description": "Active workout minutes logged"
+        },
+        "caloriesBurned": {
+          "type": "number",
+          "description": "Estimated calories burned through exercise"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the log in YYYY-MM-DD format"
+        }
+      },
+      "required": ["waterIntake", "steps", "activeMinutes", "caloriesBurned", "date"]
+    },
+    "MacroCalculatorResults": {
+      "title": "MacroCalculatorResults",
+      "description": "Computed daily caloric and macronutrient targets from macro calculator",
+      "type": "object",
+      "properties": {
+        "bmr": {
+          "type": "number",
+          "description": "Basal metabolic rate in kcal"
+        },
+        "tdee": {
+          "type": "number",
+          "description": "Total daily energy expenditure in kcal"
+        },
+        "targetCalories": {
+          "type": "number",
+          "description": "Daily target calories in kcal"
+        },
+        "protein": {
+          "type": "number",
+          "description": "Daily target protein in grams"
+        },
+        "carbs": {
+          "type": "number",
+          "description": "Daily target carbohydrates in grams"
+        },
+        "fats": {
+          "type": "number",
+          "description": "Daily target fats in grams"
+        },
+        "goal": {
+          "type": "string",
+          "description": "Fitness goal (lose, maintain, gain)"
+        },
+        "dietType": {
+          "type": "string",
+          "description": "Diet preset type"
+        }
+      },
+      "required": ["bmr", "tdee", "targetCalories", "protein", "carbs", "fats", "goal", "dietType"]
+    },
+    "MealFeedback": {
+      "title": "MealFeedback",
+      "description": "Star-rating and feedback left by the user for a specific meal",
+      "type": "object",
+      "properties": {
+        "mealId": {
+          "type": "string",
+          "description": "The ID of the meal being rated"
+        },
+        "mealName": {
+          "type": "string",
+          "description": "The name of the meal being rated"
+        },
+        "rating": {
+          "type": "number",
+          "description": "Star rating out of 5"
+        },
+        "comments": {
+          "type": "string",
+          "description": "Optional comments left by the user"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Unique identifier of the user matching request.auth.uid"
+        },
+        "userDisplayName": {
+          "type": "string",
+          "description": "The display name of the user who left the feedback"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the feedback"
+        }
+      },
+      "required": ["mealId", "mealName", "rating", "userId", "userDisplayName", "timestamp"]
+    },
+    "JobApplication": {
+      "title": "JobApplication",
+      "description": "Submitted application details for hiring team review",
+      "type": "object",
+      "properties": {
+        "fullName": {
+          "type": "string",
+          "description": "Applicant's full name"
+        },
+        "mobile": {
+          "type": "string",
+          "description": "Applicant's contact number"
+        },
+        "email": {
+          "type": "string",
+          "description": "Applicant's email address"
+        },
+        "position": {
+          "type": "string",
+          "description": "Desired job role or vacancy"
+        },
+        "location": {
+          "type": "string",
+          "description": "Current city or neighborhood"
+        },
+        "experience": {
+          "type": "string",
+          "description": "Total relevant experience"
+        },
+        "expectedSalary": {
+          "type": "string",
+          "description": "Expected compensation package"
+        },
+        "joiningDate": {
+          "type": "string",
+          "description": "Earliest available start date"
+        },
+        "comments": {
+          "type": "string",
+          "description": "Why applicant wants to join Taaza Bites"
+        },
+        "resumeName": {
+          "type": "string",
+          "description": "Original file name of the resume"
+        },
+        "resumeSize": {
+          "type": "number",
+          "description": "Resume file size in bytes"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the submission"
+        }
+      },
+      "required": ["fullName", "mobile", "email", "position", "location", "experience", "timestamp"]
+    },
+    "OrderFeedback": {
+      "title": "OrderFeedback",
+      "description": "Star-rating for meal quality and packaging, linked to an order",
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "description": "The specific ID of the order being rated"
+        },
+        "mealName": {
+          "type": "string",
+          "description": "The name of the meal in the order"
+        },
+        "mealRating": {
+          "type": "number",
+          "description": "Star rating for meal quality out of 5"
+        },
+        "packagingRating": {
+          "type": "number",
+          "description": "Star rating for packaging quality out of 5"
+        },
+        "comments": {
+          "type": "string",
+          "description": "Optional comments left by the user"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Unique identifier of the user matching request.auth.uid"
+        },
+        "userDisplayName": {
+          "type": "string",
+          "description": "The display name of the user who left the feedback"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the feedback"
+        }
+      },
+      "required": ["orderId", "mealName", "mealRating", "packagingRating", "userId", "userDisplayName", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/job_applications/{applicationId}": {
+      "schema": "JobApplication",
+      "description": "Stores applicant submissions for careers review"
+    },
+    "/meal_feedback/{feedbackId}": {
+      "schema": "MealFeedback",
+      "description": "Stores meal feedback and ratings from users for the culinary team"
+    },
+    "/order_feedback/{feedbackId}": {
+      "schema": "OrderFeedback",
+      "description": "Stores post-meal quality and packaging ratings for specific user orders"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profiles, preferences, allergies, and reward stats"
+    },
+    "/users/{userId}/vitality_logs/{date}": {
+      "schema": "VitalityLog",
+      "description": "Stores user daily hydration and activity tracking data"
+    },
+    "/users/{userId}/macro_calculator/results": {
+      "schema": "MacroCalculatorResults",
+      "description": "Stores computed calorie and macronutrient targets"
+    },
+    "/faq_searches/{searchId}": {
+      "schema": "FaqSearch",
+      "description": "Stores user search queries for FAQ optimization analytics"
+    },
+    "/faq_feedback/{feedbackId}": {
+      "schema": "FaqFeedback",
+      "description": "Stores helpful/not helpful votes from visitors"
+    }
+  }
+}

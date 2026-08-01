@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#111111"/>
+  <!-- Decorative Ring -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#222222" stroke-width="8"/>
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#059669" stroke-width="2" stroke-dasharray="12,12"/>
+  <!-- Outer leaf frame -->
+  <path d="M256 120 C180 120 140 200 140 280 C140 360 200 392 256 392 C312 392 372 360 372 280 C372 200 332 120 256 120 Z" fill="#1A1A1A" stroke="#222222" stroke-width="4"/>
+  <!-- Leaf Half Left (Green) -->
+  <path d="M256 130 C190 130 155 200 155 280 C155 350 205 380 256 380 Z" fill="#059669"/>
+  <!-- Leaf Half Right (Vibrant Orange Accent) -->
+  <path d="M256 130 C322 130 357 200 357 280 C357 350 307 380 256 380 Z" fill="#FF7A00"/>
+  <!-- Center Leaf Vein -->
+  <path d="M256 130 L256 380" stroke="#111111" stroke-width="6" stroke-linecap="round"/>
+  <!-- Sprout veins -->
+  <path d="M256 200 Q210 180 190 200" fill="none" stroke="#111111" stroke-width="4" stroke-linecap="round"/>
+  <path d="M256 240 Q302 220 322 240" fill="none" stroke="#111111" stroke-width="4" stroke-linecap="round"/>
+  <path d="M256 280 Q210 260 190 280" fill="none" stroke="#111111" stroke-width="4" stroke-linecap="round"/>
+  <path d="M256 320 Q302 300 322 320" fill="none" stroke="#111111" stroke-width="4" stroke-linecap="round"/>
+</svg>

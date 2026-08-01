@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "Kitchen": {
+      "title": "Kitchen",
+      "description": "A food preparation area",
+      "type": "object",
+      "properties": {
+        "branchId": { "type": "string" },
+        "name": { "type": "string" },
+        "capacity": { "type": "number" },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] }
+      },
+      "required": ["branchId", "name", "capacity", "status"]
+    },
+    "Branch": {
+      "title": "Branch",
+      "description": "A single business location",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "gstNumber": { "type": "string" },
+        "fssaiNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Inactive", "Under Maintenance"] }
+      },
+      "required": ["name", "code", "gstNumber", "fssaiNumber", "address", "status"]
+    },
+    "Franchise": {
+      "title": "Franchise",
+      "description": "A franchise owner",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" }
+      },
+      "required": ["name", "email", "phone"]
+    }
+  },
+  "firestore": {
+    "/branches/{branchId}": {
+      "schema": "Branch",
+      "description": "Stores branch details"
+    },
+    "/kitchens/{kitchenId}": {
+      "schema": "Kitchen",
+      "description": "Stores kitchen details"
+    },
+    "/franchises/{franchiseId}": {
+      "schema": "Franchise",
+      "description": "Stores franchise details"
+    }
+  }
+}

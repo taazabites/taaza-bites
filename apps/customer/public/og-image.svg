@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Deep Dark Background with Ambient Glow -->
+    <radialGradient id="glow" cx="100%" cy="0%" r="80%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#09090b" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f4f4f5" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1200" height="630" fill="#09090b" />
+  <!-- Ambient Gradient Overlay -->
+  <rect width="1200" height="630" fill="url(#glow)" />
+
+  <!-- 1. Logo & Badge Header Group -->
+  <g transform="translate(80, 80)">
+    <!-- App Logo Icon -->
+    <rect width="64" height="64" rx="16" fill="#10b981" />
+    <text x="32" y="38" dominant-baseline="middle" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="34" font-weight="800" fill="#ffffff" letter-spacing="-0.08em">T</text>
+
+    <!-- Pill Badge -->
+    <g transform="translate(84, 12)">
+      <rect width="250" height="40" rx="20" fill="#10b981" fill-opacity="0.1" stroke="#10b981" stroke-opacity="0.3" stroke-width="1" />
+      <text x="125" y="21" dominant-baseline="middle" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#10b981" letter-spacing="0.1em">PRECISION NUTRITION</text>
+    </g>
+  </g>
+
+  <!-- 2. Headline Group -->
+  <g transform="translate(80, 230)">
+    <text font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="72" font-weight="800" fill="url(#textGrad)" letter-spacing="-0.04em">
+      <tspan x="0" dy="0">Eat for longevity.</tspan>
+      <tspan x="0" dy="84">Not just for today.</tspan>
+    </text>
+  </g>
+
+  <!-- 3. Subtitle Group -->
+  <g transform="translate(80, 420)">
+    <text font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="26" font-weight="500" fill="#a1a1aa">
+      <tspan x="0" dy="0">Chef-curated meals engineered to your biology. Continuous glucose</tspan>
+      <tspan x="0" dy="38">friendly, macro-perfect, and delivered to your door.</tspan>
+    </text>
+  </g>
+
+  <!-- 4. Footer Group -->
+  <g transform="translate(80, 540)">
+    <!-- Custom Vector Fork-and-Knife/Utensils graphic from user snippet -->
+    <g transform="translate(0, 0)">
+      <path d="M14 4V16M10 4V8C10 10.2091 11.7909 12 14 12M18 4V8C18 10.2091 16.2091 12 14 12M14 12V20" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+      <path d="M26 4C23.7909 4 22 5.79086 22 8V20C22 22.2091 23.7909 24 26 24M26 4C28.2091 4 30 5.79086 30 8V20C30 22.2091 28.2091 24 26 24M26 4V20M26 24V20" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" transform="translate(-8, 0)" />
+    </g>
+    <!-- Brand Domain Link -->
+    <text x="36" y="16" dominant-baseline="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" fill="#52525b">taazabites.com</text>
+  </g>
+</svg>

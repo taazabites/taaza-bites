@@ -1,0 +1,234 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", serif;
+  --font-script: "Satisfy", "Caveat", cursive;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+::selection {
+  background-color: #059669;
+  color: white;
+}
+
+:root { 
+  --primary: #059669; 
+  --soft-bg: #F5F2ED;
+}
+
+html, body {
+  scroll-behavior: smooth;
+  overscroll-behavior-y: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+body { 
+  background: var(--soft-bg); 
+  margin: 0; 
+  font-family: var(--font-sans);
+}
+
+/* iOS Safari Zoom Fix for inputs */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* --- Mobile-First Layout & Touch Target Refinements --- */
+@media screen and (max-width: 768px) {
+  /* Ensure typical interactive key controls have comfortable touch targets */
+  .btn-touch-target,
+  button.primary-btn,
+  .mobile-tap-target {
+    min-height: 48px;
+    box-sizing: border-box;
+  }
+
+  /* Smooth momentum scrolling for mobile horizontal slider containers */
+  .overflow-x-auto,
+  .snap-x {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Add invisible interactive padding for small inline buttons & icons to exceed 44px without bloating design visually */
+  .tap-target-expanded {
+    position: relative;
+  }
+  .tap-target-expanded::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px;
+    min-height: 44px;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+  }
+}
+
+/* Glassmorphism Variants */
+.glass-morphism-dark {
+  background: rgba(13, 14, 18, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-morphism-emerald {
+  background: rgba(5, 150, 105, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(5, 150, 105, 0.25);
+}
+
+/* Premium Loader */
+/* Loader styles are now inlined in index.html to prevent flash of unstyled content */
+
+/* Marquee Animation */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-33.333%); }
+}
+@keyframes marquee-reverse {
+  0% { transform: translateX(-33.333%); }
+  100% { transform: translateX(0); }
+}
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+.animate-marquee-reverse {
+  animation: marquee-reverse 35s linear infinite;
+}
+.animate-marquee:hover, .animate-marquee-reverse:hover {
+  animation-play-state: paused;
+}
+.mask-fade-sides {
+  mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+}
+
+#root:empty { min-height: 100vh; background: var(--soft-bg); }
+
+/* Scrollbar Hiding & Touch Momentum Utilities across all browsers */
+.scrollbar-hide,
+.hide-scrollbar,
+.scrollbar-none,
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.scrollbar-hide::-webkit-scrollbar,
+.hide-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Mobile Side Sliding & Touch Pan Physics */
+.touch-pan-x {
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.glass-morphism {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: blur(5px);
+  will-change: transform, opacity;
+}
+
+@media (max-width: 1024px) {
+  .animate-on-scroll {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+}
+
+.animate-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+[data-animation="fade-in"] {
+  transform: translateY(0);
+}
+
+[data-animation="slide-in-right"] {
+  transform: translateX(50px);
+}
+
+[data-animation="slide-in-right"].is-visible {
+  transform: translateX(0);
+}
+
+[data-animation="slide-up"] {
+  transform: translateY(50px);
+}
+
+@keyframes shimmer { 
+  0% { transform: translateX(-100%); } 
+  100% { transform: translateX(100%); } 
+}
+.animate-shimmer { 
+  animation: shimmer 1.5s infinite linear; 
+}
+
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@keyframes slide-up {
+  0% {
+    transform: translateY(1.5rem) scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
