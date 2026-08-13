@@ -55,7 +55,6 @@ const MealDetailModal: React.FC<MealDetailModalProps> = ({ item, onClose }) => {
                         <SmartButton 
                             label="Order Now" 
                             href={PORTAL_LINKS.order}
-                            target="_blank"
                             variant="primary" 
                             icon={<Zap className="w-5 h-5" />} 
                             className="w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 text-base sm:text-lg shadow-[0_8px_30px_rgba(5,150,105,0.25)]" 

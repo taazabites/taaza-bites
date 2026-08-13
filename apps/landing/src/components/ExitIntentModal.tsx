@@ -190,8 +190,6 @@ export const ExitIntentModal: React.FC<ExitIntentModalProps> = ({ isOpen, onClos
 
                             <a 
                                 href={PORTAL_LINKS.order}
-                                target="_blank"
-                                rel="noopener noreferrer"
                                 className="relative h-16 w-full rounded-[1.5rem] bg-[#1A1A1A] text-white flex items-center justify-center gap-4 overflow-hidden shadow-2xl group/cta mt-auto border border-white/5 active:scale-95 transition-all"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#FF7A00]/30 to-transparent -translate-x-full group-hover/cta:animate-scan transition-transform duration-1000"></div>

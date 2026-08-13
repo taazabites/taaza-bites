@@ -48,8 +48,6 @@ export const SignatureMenu: React.FC<{ onNavigate: (path: string) => void }> = (
                                 <div className="absolute top-6 right-6 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-all duration-300">
                                      <a 
                                         href={PORTAL_LINKS.order}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
                                         className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-white text-[#1A1A1A] flex items-center justify-center shadow-xl active:scale-90 transition-transform"
                                      >
                                         <ArrowRight className="w-5 h-5 text-zinc-950" />

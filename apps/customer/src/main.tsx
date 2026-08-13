@@ -172,7 +172,7 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <ToastProvider>
           <ErrorBoundary>
-            <BrowserRouter>
+            <BrowserRouter basename="/app">
               <App />
             </BrowserRouter>
           </ErrorBoundary>

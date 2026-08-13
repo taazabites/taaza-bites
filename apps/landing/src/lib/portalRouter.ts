@@ -26,10 +26,7 @@ export const SUPER_ADMIN_EMAILS = new Set([
   'admin@taazabites.in',
 ]);
 
-const ROLE_API_URL = (
-  import.meta.env.VITE_ROLE_API_URL ||
-  `${(import.meta.env.VITE_ADMIN_URL || 'http://localhost:3001').replace(/\/$/, '')}/api/me`
-);
+const ROLE_API_URL = import.meta.env.VITE_ROLE_API_URL || "/api/me";
 
 async function safeGet(existsCheck: () => Promise<{ exists: boolean; data?: Record<string, unknown> }>) {
   try {

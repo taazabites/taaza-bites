@@ -53,7 +53,7 @@ const navItems: NavItem[] = [
   {
     title: "Dashboard",
     icon: LayoutDashboard,
-    href: "/admin"
+    href: "/"
   },
   {
     title: "Customers",
@@ -404,7 +404,7 @@ export const Sidebar = React.memo(function Sidebar({ className, isOpen, setIsOpe
   }, [searchQuery, user?.role]);
 
   const checkIsActive = (href: string) => {
-    if (href === "/admin" || href === "/orders" || href === "/customers" || href === "/meals" || href === "/delivery" || href === "/inventory" || href === "/service-areas" || href === "/finance") {
+    if (href === "/" || href === "/orders" || href === "/customers" || href === "/meals" || href === "/delivery" || href === "/inventory" || href === "/service-areas" || href === "/finance") {
       return location.pathname === href;
     }
     return location.pathname === href || location.pathname.startsWith(href + "/");
@@ -466,7 +466,7 @@ export const Sidebar = React.memo(function Sidebar({ className, isOpen, setIsOpe
         )}
       >
         <div className={cn("flex h-[60px] items-center justify-between shrink-0 border-b border-border transition-all duration-300", isCollapsed ? "px-3" : "px-6")}>
-          <Link to="/admin" className="flex items-center gap-3 font-semibold tracking-tight text-lg text-foreground group overflow-hidden">
+          <Link to="/" className="flex items-center gap-3 font-semibold tracking-tight text-lg text-foreground group overflow-hidden">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors shrink-0">
               <UtensilsCrossed className="h-4 w-4" />
             </div>

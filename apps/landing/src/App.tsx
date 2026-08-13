@@ -1359,8 +1359,6 @@ export const App: React.FC = () => {
 
                 <a
                   href={PORTAL_LINKS.subscribe}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="pointer-events-auto bg-[#1A1A1A] hover:bg-black text-white px-5 py-3.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)] transition-all duration-300 hover:-translate-y-1 group flex items-center gap-2.5 border border-white/10"
                   aria-label="Subscribe"
                 >
@@ -1375,8 +1373,6 @@ export const App: React.FC = () => {
 
                 <a
                   href={PORTAL_LINKS.order}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="pointer-events-auto bg-[#059669] hover:bg-[#047857] text-white px-6 py-4 rounded-full shadow-[0_8px_30px_rgba(5,150,105,0.4)] hover:shadow-[0_12px_40px_rgba(5,150,105,0.6)] transition-all duration-300 hover:-translate-y-1 group flex items-center gap-3 border border-white/20"
                   aria-label="Order Now"
                 >

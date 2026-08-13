@@ -102,8 +102,6 @@ export const Features: React.FC = () => {
                 <div className="mt-16 flex justify-center">
                     <a 
                         href={PORTAL_LINKS.order} 
-                        target="_blank"
-                        rel="noreferrer"
                         className="group relative px-8 py-4 bg-[#059669] text-white rounded-full font-bold uppercase tracking-[0.15em] text-sm sm:text-base overflow-hidden shadow-xl transition-all duration-300 hover:-translate-y-1 flex items-center justify-center"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-[#059669] to-[#F59E0B] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>

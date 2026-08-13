@@ -87,19 +87,18 @@ function getRazorpay() {
 async function startServer() {
   const app = express();
   app.use(express.json());
-  const PORT = parseInt(process.env.PORT || "3000", 10);
+  const PORT = parseInt(process.env.PORT || "3001", 10);
 
   // CORS for landing / sibling apps calling /api/me
   app.use((req, res, next) => {
     const origin = req.headers.origin || '';
     const allowed = [
-      process.env.VITE_LANDING_URL || 'http://localhost:3002',
-      process.env.VITE_CUSTOMER_URL || 'http://localhost:3000',
-      process.env.VITE_DELIVERY_URL || 'http://localhost:3003',
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:3002',
       'http://localhost:3003',
+      'https://www.taazabites.in',
+      'https://taazabites.in',
     ];
     if (!origin || allowed.some((o) => origin.startsWith(o.replace(/\/$/, '')))) {
       res.setHeader('Access-Control-Allow-Origin', origin || '*');

@@ -29,7 +29,6 @@ const MealResultCard: React.FC<{ result: AIMealSuggestion }> = ({ result }) => {
                         label="Order Module" 
                         hoverLabel="Go Live" 
                         href={PORTAL_LINKS.order}
-                        target="_blank"
                         variant="accent" 
                         icon={<Zap className="w-5 h-5" />} 
                         className="w-full !h-20" 

@@ -46,10 +46,10 @@ export default function SuperAdminPage() {
   const [loading, setLoading] = useState(false);
 
   const [portals, setPortals] = useState({
-    customerUrl: "http://localhost:3000",
-    adminUrl: "http://localhost:3001",
-    landingUrl: "http://localhost:3002",
-    deliveryUrl: "http://localhost:3003",
+    customerUrl: "/app",
+    adminUrl: "/admin",
+    landingUrl: "/",
+    deliveryUrl: "/partner",
   });
   const [flags, setFlags] = useState({
     maintenanceMode: false,

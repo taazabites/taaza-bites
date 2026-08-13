@@ -73,9 +73,7 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
                 {/* Mobile & Desktop Action Dock */}
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 animate-fade-in-up w-full max-w-md sm:max-w-none mx-auto mb-6" style={{ animationDelay: '0.5s' }}>
                     <a 
-                        href={PORTAL_LINKS.subscribe} 
-                        target="_blank"
-                        rel="noreferrer"
+                        href={PORTAL_LINKS.subscribe}
                         className="group relative px-6 py-4 sm:px-9 sm:py-4.5 bg-[#059669] text-white rounded-full font-bold uppercase tracking-[0.15em] text-xs sm:text-base overflow-hidden shadow-[0_20px_40px_rgba(5,150,105,0.4)] hover:shadow-[0_25px_50px_rgba(5,150,105,0.6)] transition-all duration-300 hover:-translate-y-1 flex items-center justify-center w-full sm:w-auto"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-[#059669] to-[#F59E0B] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -86,9 +84,7 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
                     </a>
                     
                     <a 
-                        href={PORTAL_LINKS.order} 
-                        target="_blank"
-                        rel="noreferrer"
+                        href={PORTAL_LINKS.order}
                         className="px-6 py-4 sm:px-9 sm:py-4.5 rounded-full border-2 border-white/40 text-white font-bold uppercase tracking-[0.15em] text-xs sm:text-base hover:bg-white hover:text-black hover:border-white transition-all duration-300 backdrop-blur-md flex items-center justify-center gap-2 w-full sm:w-auto"
                     >
                         Order Online

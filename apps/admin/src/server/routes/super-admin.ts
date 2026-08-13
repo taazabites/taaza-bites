@@ -37,10 +37,10 @@ router.get('/portals', authenticate, async (req: AuthenticatedRequest, res) => {
   ]);
 
   const defaults = {
-    customerUrl: process.env.VITE_CUSTOMER_URL || 'http://localhost:3000',
-    adminUrl: process.env.VITE_ADMIN_URL || 'http://localhost:3001',
-    landingUrl: process.env.VITE_LANDING_URL || 'http://localhost:3002',
-    deliveryUrl: process.env.VITE_DELIVERY_URL || 'http://localhost:3003',
+    customerUrl: process.env.VITE_CUSTOMER_URL || '/app',
+    adminUrl: process.env.VITE_ADMIN_URL || '/admin',
+    landingUrl: process.env.VITE_LANDING_URL || '/',
+    deliveryUrl: process.env.VITE_DELIVERY_URL || '/partner',
   };
 
   res.json({

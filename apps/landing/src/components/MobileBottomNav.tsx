@@ -40,8 +40,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentPath, o
                     
                     const elementProps = isAnchor ? {
                         href: tab.href,
-                        target: "_blank",
-                        rel: "noopener noreferrer",
                     } : {
                         onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
                             e.preventDefault();

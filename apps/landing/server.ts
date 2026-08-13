@@ -12,10 +12,11 @@ import {
   translateBlogPost,
   generateAiSearchResultsStream,
 } from "./src/services/geminiService";
+import { attachGatewayWebSockets, mountAppGateway } from "./gateway";
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3002;
 
   // Security & Performance Middlewares
   app.use(
@@ -25,10 +26,14 @@ async function startServer() {
     })
   );
   app.use(compression());
+
+  // Unified host: /app customer, /admin ops, /partner delivery (before body parser)
+  mountAppGateway(app);
+
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-  // Rate Limiting
+  // Rate Limiting (landing APIs only; portal prefixes already proxied)
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
@@ -218,14 +223,29 @@ async function startServer() {
         },
       })
     );
-    app.get("*all", (req, res) => {
+    app.get("*all", (req, res, next) => {
+      if (
+        req.path === "/app" ||
+        req.path.startsWith("/app/") ||
+        req.path === "/admin" ||
+        req.path.startsWith("/admin/") ||
+        req.path === "/partner" ||
+        req.path.startsWith("/partner/")
+      ) {
+        return next();
+      }
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Website running on http://localhost:${PORT}`);
+    console.log(`  /        landing`);
+    console.log(`  /app     customer`);
+    console.log(`  /admin   admin`);
+    console.log(`  /partner delivery`);
   });
+  attachGatewayWebSockets(server);
 }
 
 startServer().catch((err) => {

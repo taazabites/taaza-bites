@@ -43,7 +43,6 @@ export const CtaSection: React.FC = () => {
                     <SmartButton 
                         label="View Meal Plans" 
                         href={PORTAL_LINKS.subscribe} 
-                        target="_blank"
                         variant="primary"
                         className="w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 text-base sm:text-lg shadow-[0_8px_30px_rgba(5,150,105,0.25)] font-black uppercase tracking-wider"
                     />

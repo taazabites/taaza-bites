@@ -257,7 +257,6 @@ export const MealPlanner: React.FC = () => {
                                         variant="accent" 
                                         className="!h-14 !px-8 !text-[9px]" 
                                         href={PORTAL_LINKS.order}
-                                        target="_blank"
                                     />
                                 </div>
                             </div>

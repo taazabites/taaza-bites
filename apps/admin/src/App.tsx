@@ -142,19 +142,15 @@ export default function App() {
   return (
     <AuthProvider>
       <Toaster position="top-right" expand={false} richColors theme="dark" />
-      <BrowserRouter>
+      <BrowserRouter basename="/admin">
         <Routes>
-          {/* Customer Routes */}
-          <Route path="/" element={<Navigate to="/admin" replace />} />
-          <Route path="/login" element={<Navigate to="/admin/login" replace />} />
-          {/* Admin Routes */}
-          <Route path="/admin/login" element={<LoginPage />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<Suspense fallback={<RouteLoader />}><UnauthorizedPage /></Suspense>} />
           
           <Route element={<ProtectedRoute />}>
             <Route element={<AdminLayout />}>
               <Route element={<Suspense fallback={<RouteLoader />}><Outlet /></Suspense>}>
-                <Route path="/admin" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
+                <Route path="/" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
                 <Route path="/analytics" element={<ErrorBoundary><AnalyticsPage /></ErrorBoundary>} />
                 
                 <Route path="/orders" element={<ErrorBoundary><OrdersDashboardPage /></ErrorBoundary>} />

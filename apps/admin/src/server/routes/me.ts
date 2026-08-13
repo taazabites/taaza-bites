@@ -6,10 +6,10 @@ import { isSuperAdminEmail } from '../../lib/super-admin';
 const router = Router();
 
 function portalUrlsFromEnv() {
-  const customer = (process.env.VITE_CUSTOMER_URL || 'http://localhost:3000').replace(/\/$/, '');
-  const admin = (process.env.VITE_ADMIN_URL || process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '');
-  const delivery = (process.env.VITE_DELIVERY_URL || 'http://localhost:3003').replace(/\/$/, '');
-  const landing = (process.env.VITE_LANDING_URL || 'http://localhost:3002').replace(/\/$/, '');
+  const customer = (process.env.VITE_CUSTOMER_URL || '/app').replace(/\/$/, '');
+  const admin = (process.env.VITE_ADMIN_URL || '/admin').replace(/\/$/, '');
+  const delivery = (process.env.VITE_DELIVERY_URL || '/partner').replace(/\/$/, '');
+  const landing = (process.env.VITE_LANDING_URL || '/').replace(/\/$/, '') || '/';
   return { customer, admin, delivery, landing };
 }
 
@@ -88,7 +88,7 @@ router.get('/api/me', async (req, res) => {
           kind: 'admin',
           label: 'Admin Panel',
           description: 'Super Admin — bootstrap on first admin login',
-          url: `${urls.admin}/admin/login`,
+          url: `${urls.admin}/login`,
           roleLabel: adminRole,
         });
         primary = 'admin';

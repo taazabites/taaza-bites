@@ -44,10 +44,18 @@ export const SmartButton: React.FC<SmartButtonProps> = ({
             console.warn('Vibration failed:', err);
         }
         
-        if (href && href.startsWith('/') && !target) {
+        const isPortal =
+            !!href &&
+            (href === "/app" ||
+                href.startsWith("/app/") ||
+                href === "/admin" ||
+                href.startsWith("/admin/") ||
+                href === "/partner" ||
+                href.startsWith("/partner/"));
+        if (href && href.startsWith("/") && !target && !isPortal) {
             e.preventDefault();
-            window.history.pushState(null, '', href);
-            window.dispatchEvent(new Event('popstate'));
+            window.history.pushState(null, "", href);
+            window.dispatchEvent(new Event("popstate"));
         }
         
         onClick?.(e);
@@ -109,7 +117,14 @@ export const SmartButton: React.FC<SmartButtonProps> = ({
     );
 
     if (href) {
-        const isExternal = href.startsWith('http') || href.startsWith('//') || href.startsWith('tel:') || href.startsWith('mailto:');
+        let isExternal = false;
+        if (href.startsWith('tel:') || href.startsWith('mailto:')) {
+            isExternal = true;
+        } else if (href.startsWith('http://') || href.startsWith('https://')) {
+            const isWa = href.includes('wa.me') || href.includes('whatsapp.com');
+            const isSocial = href.includes('instagram.com') || href.includes('facebook.com') || href.includes('twitter.com') || href.includes('x.com') || href.includes('linkedin.com');
+            isExternal = isWa || isSocial;
+        }
         const resolvedTarget = target || (isExternal ? '_blank' : undefined);
         return (
             <a 

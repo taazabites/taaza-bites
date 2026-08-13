@@ -208,8 +208,6 @@ export const SeoMealPlanPage: React.FC<{
 
                                                 <a
                                                     href={PORTAL_LINKS.subscribe}
-                                                    target="_blank"
-                                                    rel="noreferrer"
                                                     className="w-full mt-2 py-3 bg-[#059669] hover:bg-[#047857] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm"
                                                 >
                                                     Select Subscription Plan <ArrowDown className="w-3.5 h-3.5" />

@@ -26,7 +26,6 @@ if (missingVars.length > 0) {
 
 import compression from 'compression';
 import express from "express";
-import path from "path";
 import Razorpay from "razorpay";
 const RazorpayClient = (Razorpay as any).default || Razorpay;
 import crypto from "crypto";

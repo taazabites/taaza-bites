@@ -14,7 +14,15 @@ interface FooterLinkProps {
 }
 
 const FooterLink: React.FC<FooterLinkProps> = ({ href, text, onNavigate }) => {
+  const isPortal =
+    href === "/app" ||
+    href.startsWith("/app/") ||
+    href === "/admin" ||
+    href.startsWith("/admin/") ||
+    href === "/partner" ||
+    href.startsWith("/partner/");
   const isExternal =
+    isPortal ||
     href.startsWith("http") ||
     href.startsWith("mailto") ||
     href.startsWith("tel") ||
@@ -35,8 +43,8 @@ const FooterLink: React.FC<FooterLinkProps> = ({ href, text, onNavigate }) => {
       <a
         href={href}
         className={`block py-2 text-sm transition-colors duration-300 ${isPlaceholder ? "text-gray-500 cursor-default" : "text-gray-400 hover:text-[#059669]"}`}
-        target={isExternal ? "_blank" : "_self"}
-        rel={isExternal ? "noopener noreferrer" : ""}
+        target={isExternal && !isPortal ? "_blank" : "_self"}
+        rel={isExternal && !isPortal ? "noopener noreferrer" : ""}
         onClick={handleClick}
       >
         {text}

@@ -30,7 +30,7 @@ export default function LoginPage() {
     
     try {
       await login(email, password)
-      navigate("/admin")
+      navigate("/")
     } catch (err: any) {
       if (err.code === 'auth/captcha-check-failed') {
         setError("reCAPTCHA validation failed. Please check your network or try again.");

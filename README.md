@@ -8,14 +8,14 @@ Taaza Bites is a multi-application food-tech platform that powers the full subsc
 
 ## Overview
 
-The platform is organized as an **npm workspaces monorepo** with four independently deployable applications that share a common authentication project and role-based entry paths.
+The platform is organized as an **npm workspaces monorepo** with four applications that share one public host, a common authentication project, and role-based entry paths.
 
-| Application | Responsibility |
-|-------------|----------------|
-| **Landing** | Public website, SEO surfaces, CTAs, and authenticated portal routing |
-| **Customer** | Subscriptions, meal plans, account, wallet, and self-serve flows |
-| **Admin** | Operations console with RBAC and a Super Admin control plane |
-| **Delivery** | Partner-facing app for assignments, tracking, and earnings |
+| Public URL | App | Responsibility |
+|------------|-----|----------------|
+| `https://www.taazabites.in` | Landing | Public website, SEO surfaces, CTAs, and authenticated portal routing |
+| `https://www.taazabites.in/app` | Customer | Subscriptions, meal plans, account, wallet, and self-serve flows |
+| `https://www.taazabites.in/admin` | Admin | Operations console with RBAC and a Super Admin control plane |
+| `https://www.taazabites.in/partner` | Delivery | Partner-facing app for assignments, tracking, and earnings |
 
 ```text
 taaza-bites/
@@ -49,9 +49,9 @@ flowchart TB
     D[Delivery Partner App]
   end
 
-  L -->|Subscribe / Order| C
-  L -->|Staff login| A
-  L -->|Partner login| D
+  L -->|/app| C
+  L -->|/admin| A
+  L -->|/partner| D
   L -->|Sign-in + role resolve| FA
   FA -->|role: customer| C
   FA -->|role: admin / super admin| A
@@ -63,6 +63,7 @@ flowchart TB
 
 - **Separation of concerns** — each persona gets a dedicated app instead of one overloaded SPA  
 - **Shared identity, scoped data** — one Firebase Auth project; domain-specific Firestore databases  
+- **One public host** — landing is the website; customer, admin, and delivery are path prefixes on the same origin  
 - **Hub-and-spoke entry** — the landing site is the public front door; deep links and role checks route users correctly  
 - **Least privilege** — delivery partners cannot self-provision; staff require invites; Super Admin owns elevated controls  
 
@@ -148,14 +149,13 @@ cp apps/admin/.env.example apps/admin/.env
 cp apps/delivery/.env.example apps/delivery/.env
 ```
 
-**Landing portal wiring** (`apps/landing/.env`):
+**Landing portal wiring** (`apps/landing/.env`) — same-origin paths:
 
 ```env
-VITE_CUSTOMER_URL=http://localhost:3000
-VITE_ADMIN_URL=http://localhost:3001
-VITE_DELIVERY_URL=http://localhost:3003
-VITE_LANDING_URL=http://localhost:3002
-VITE_ROLE_API_URL=http://localhost:3001/api/me
+VITE_CUSTOMER_URL=/app
+VITE_ADMIN_URL=/admin
+VITE_DELIVERY_URL=/partner
+VITE_ROLE_API_URL=/api/me
 ```
 
 **Admin server (optional but recommended for Super Admin APIs):**
@@ -168,29 +168,31 @@ FIREBASE_PRIVATE_KEY=
 
 ### Run development servers
 
-| App | Command | URL |
-|-----|---------|-----|
-| Landing | `cd apps/landing && PORT=3002 npm run dev` | http://localhost:3002 |
-| Admin | `cd apps/admin && PORT=3001 npm run dev` | http://localhost:3001 |
-| Customer | `cd apps/customer && npx vite --port=3000 --host=0.0.0.0` | http://localhost:3000 |
-| Delivery | `cd apps/delivery && npm run dev` | http://localhost:3003 |
+Start all four processes. Open **only the landing host** — it proxies the other apps:
 
-Windows PowerShell examples:
+| Public URL | App | Upstream |
+|------------|-----|----------|
+| http://localhost:3002 | Landing (gateway) | — |
+| http://localhost:3002/app | Customer | :3000 |
+| http://localhost:3002/admin | Admin | :3001 |
+| http://localhost:3002/partner | Delivery | :3003 |
+
+Windows PowerShell:
 
 ```powershell
-cd apps/landing; $env:PORT='3002'; npm run dev
-cd apps/admin;   $env:PORT='3001'; npm run dev
+cd apps/admin;    npm run dev
 cd apps/customer; npx vite --port=3000 --host=0.0.0.0
 cd apps/delivery; npm run dev
+cd apps/landing;  npm run dev
 ```
 
 From the monorepo root (after workspace install):
 
 ```bash
-npm run dev:landing
 npm run dev:admin
-npm run dev:customer
+npm run dev:customer:ui
 npm run dev:delivery
+npm run dev:landing
 ```
 
 ---

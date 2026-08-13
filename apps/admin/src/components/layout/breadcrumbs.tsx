@@ -95,7 +95,7 @@ export function Breadcrumbs() {
     >
       <div className="flex items-center gap-1.5 shrink-0">
         <Link 
-          to="/admin" 
+          to="/" 
           id="breadcrumb-home-link"
           className="flex items-center gap-1 hover:text-foreground text-muted-foreground/85 transition-colors"
         >

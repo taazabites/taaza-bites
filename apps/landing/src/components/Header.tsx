@@ -86,8 +86,9 @@ export const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate }) => {
       return;
     }
     if (path.startsWith('http')) {
-      const opened = window.open(path, '_blank');
-      if (!opened) {
+      if (path.includes('wa.me') || path.includes('whatsapp.com')) {
+        window.open(path, '_blank', 'noopener,noreferrer');
+      } else {
         window.location.href = path;
       }
       setIsMobileMenuOpen(false);
@@ -247,7 +248,6 @@ export const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate }) => {
               <SmartButton
                 label="Order Now"
                 href={PORTAL_LINKS.order}
-                target="_blank"
                 variant="primary"
                 className="bg-[#059669] hover:bg-[#047857] text-white px-3 py-2 text-sm shadow-[0_4px_14px_0_rgba(5,150,105,0.39)] hover:shadow-[0_6px_20px_rgba(5,150,105,0.23)] hover:-translate-y-0.5 transition-all"
               />
@@ -257,8 +257,6 @@ export const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate }) => {
             <div className="lg:hidden flex items-center gap-2 sm:gap-3">
               <a
                 href={PORTAL_LINKS.order}
-                target="_blank"
-                rel="noopener noreferrer"
                 className={`px-4 py-1.5 sm:px-5 sm:py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-full transition-all duration-300 active:scale-95 shadow-sm hover:shadow-md ${
                   isHeaderSolid && !isDarkPage
                     ? "bg-[#059669] text-white hover:bg-[#047857]"
