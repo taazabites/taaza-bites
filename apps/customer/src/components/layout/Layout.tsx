@@ -22,9 +22,11 @@ import { throttle } from '../../lib/performance';
 import CommandMenu from './CommandMenu';
 import MobileInstallPrompt from './mobile-install-prompt';
 import { DynamicSeoHelmet } from '../common/DynamicSeoHelmet';
+import { useSubscriptionLifecycleNotifications } from '@/src/hooks/useSubscriptionLifecycleNotifications';
 
 export default function Layout({children}: {children: ReactNode}) {
   const {user} = useAuth();
+  useSubscriptionLifecycleNotifications();
   const {showToast} = useToast();
   const navigate = useNavigate();
   const location = useLocation();

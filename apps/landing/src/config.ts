@@ -27,7 +27,7 @@ export const DELIVERY_APP_URL = portalUrl("VITE_DELIVERY_URL", PUBLIC_PATHS.deli
 export const PORTAL_LINKS = {
   customer: CUSTOMER_APP_URL,
   subscribe: CUSTOMER_APP_URL,
-  order: CUSTOMER_APP_URL,
+  order: "/order",
   customerHome: CUSTOMER_APP_URL,
   customerLogin: `${CUSTOMER_APP_URL}/login`,
   adminHome: ADMIN_APP_URL,

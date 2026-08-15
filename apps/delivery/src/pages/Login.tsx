@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
+import { DEMO_PARTNER } from "@/lib/demo-credentials";
 
 export default function Login() {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -16,7 +17,7 @@ export default function Login() {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const { user, profile, loading: authLoading, accessDeniedReason } = useAuth();
+  const { user, profile, loading: authLoading, accessDeniedReason, allowDemoLogin, loginDemo } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,6 +33,18 @@ export default function Login() {
       });
     }
   }, []);
+
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    try {
+      await loginDemo();
+      navigate("/", { replace: true });
+    } catch (error: any) {
+      toast.error(error.message || "Demo login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,6 +131,30 @@ export default function Login() {
               {loading ? "Sending OTP..." : "Get OTP"}
               {!loading && <ArrowRight className="ml-2 size-4" />}
             </Button>
+
+            {allowDemoLogin && (
+              <div className="space-y-2 pt-2">
+                <div className="relative flex items-center py-1">
+                  <div className="flex-grow border-t border-border" />
+                  <span className="mx-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                    Demo
+                  </span>
+                  <div className="flex-grow border-t border-border" />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={loading}
+                  onClick={handleDemoLogin}
+                >
+                  Enter as Demo Partner
+                </Button>
+                <p className="text-center text-[10px] text-zinc-500">
+                  Phone preview: +91 {DEMO_PARTNER.phone}
+                </p>
+              </div>
+            )}
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-6">

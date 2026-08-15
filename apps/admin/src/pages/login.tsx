@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function LoginPage() {
-  const { user, login, resetPassword } = useAuth()
+  const { user, login, loginDemo, resetPassword, allowDemoLogin } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -21,6 +21,20 @@ export default function LoginPage() {
   }
 
   const isLoginDisabled = loading || !email || !password || password.length < 8;
+
+  const handleDemo = async (role: "Super Admin" | "Admin") => {
+    setError("")
+    setSuccess("")
+    setLoading(true)
+    try {
+      await loginDemo(role)
+      navigate("/")
+    } catch (err: any) {
+      setError(err.message || "Demo login failed")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -140,6 +154,37 @@ export default function LoginPage() {
                 {loading ? "Signing in..." : "Initiate Link"}
               </Button>
             </form>
+
+            {allowDemoLogin && (
+              <div className="mt-6 space-y-2 border-t border-zinc-800 pt-5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                  Demo dashboard access
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                  disabled={loading}
+                  onClick={() => handleDemo("Super Admin")}
+                >
+                  Enter as Super Admin
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                  disabled={loading}
+                  onClick={() => handleDemo("Admin")}
+                >
+                  Enter as Admin
+                </Button>
+                <p className="text-[10px] text-zinc-500 leading-relaxed">
+                  Or sign in with <span className="text-zinc-300">admin@taazabites.in</span> /
+                  <span className="text-zinc-300"> demo.admin@taazabites.in</span> · password{" "}
+                  <span className="text-zinc-300">DemoAdmin!234</span>
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>

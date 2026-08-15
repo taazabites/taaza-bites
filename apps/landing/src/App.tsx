@@ -23,13 +23,11 @@ const WhyUs = lazy(() => import("./components/WhyUs").then(m => ({ default: m.Wh
 const QualityMetrics = lazy(() => import("./components/WhyUs").then(m => ({ default: m.QualityMetrics })));
 const LandingInteractiveShowcase = lazy(() => import("./components/LandingInteractiveShowcase").then(m => ({ default: m.LandingInteractiveShowcase })));
 import { MobileBottomNav } from "./components/MobileBottomNav";
-import { PORTAL_LINKS } from "./config";
-import { SubscriptionQuickInfo } from "./components/SubscriptionQuickInfo";
-import { WhatsAppSupportDrawer } from "./components/WhatsAppSupportDrawer";
+import { WhatsAppIcon, WHATSAPP_CONSULTATION_HREF } from "./components/WhatsAppSupportDrawer";
 import { LogisticsDrawer } from "./components/LogisticsDrawer";
 import { SEO } from "./components/SEO";
 import { Breadcrumbs } from "./components/Breadcrumbs";
-import { ShoppingBag, PackageOpen, Sparkles } from "lucide-react";
+import { PackageOpen, Sparkles } from "lucide-react";
 
 import { AppLoader } from "./components/AppLoader";
 import { AnimatePresence } from "motion/react";
@@ -165,7 +163,25 @@ const Subscriptions = lazyWithRetry(() =>
   import("./components/Subscriptions").then((m) => ({
     default: m.Subscriptions,
   })),
+  "/subscriptions-engine"
+);
+const SubscriptionsBrowsePage = lazyWithRetry(() =>
+  import("./components/SubscriptionsBrowsePage").then((m) => ({
+    default: m.SubscriptionsBrowsePage,
+  })),
   "/subscriptions"
+);
+const ProductsPage = lazyWithRetry(() =>
+  import("./components/ProductsPage").then((m) => ({
+    default: m.ProductsPage,
+  })),
+  "/products"
+);
+const OrderNowPage = lazyWithRetry(() =>
+  import("./components/OrderNowPage").then((m) => ({
+    default: m.OrderNowPage,
+  })),
+  "/order"
 );
 const CorporateBooking = lazyWithRetry(() =>
   import("./components/CorporateBooking").then((m) => ({
@@ -295,7 +311,6 @@ import { seoConfig, PageMetadata } from "./seoConfig";
 const pathToSectionIdMap: { [key: string]: string } = {
   "/": "hero",
   "/home": "hero",
-  "/subscriptions": "subscriptions",
   "/weight-loss-meal-plan-bangalore": "subscriptions",
   "/high-protein-meals-bangalore": "subscriptions",
   "/pcos-meal-plan-bangalore": "subscriptions",
@@ -341,6 +356,9 @@ const pathToSectionIdMap: { [key: string]: string } = {
 };
 
 const STANDALONE_PATHS = [
+  "/subscriptions",
+  "/products",
+  "/order",
   "/corporate-booking",
   "/blog",
   "/shipping",
@@ -415,6 +433,33 @@ const LazyContent: React.FC<{
       </ErrorBoundary>
     );
   }
+
+  if (currentPath === "/subscriptions")
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<GenericSectionSkeleton />}>
+          <SubscriptionsBrowsePage onNavigate={onNavigate} />
+        </Suspense>
+      </ErrorBoundary>
+    );
+
+  if (currentPath === "/products")
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<GenericSectionSkeleton />}>
+          <ProductsPage onNavigate={onNavigate} />
+        </Suspense>
+      </ErrorBoundary>
+    );
+
+  if (currentPath === "/order")
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<GenericSectionSkeleton />}>
+          <OrderNowPage onNavigate={onNavigate} />
+        </Suspense>
+      </ErrorBoundary>
+    );
 
   if (currentPath === "/corporate-booking")
     return (
@@ -1247,6 +1292,11 @@ export const App: React.FC = () => {
   const isEmbedMode = typeof window !== "undefined" && window.location.search.includes("embed=true");
   const isDarkPage = currentPathStr === "/debug" || currentPathStr === "/careers";
   const isFocusMode = currentPathStr === "/health-assessment" || isEmbedMode;
+  const hideSiteHeader =
+    isFocusMode ||
+    currentPathStr === "/subscriptions" ||
+    currentPathStr === "/products" ||
+    currentPathStr === "/order";
 
   return (
     <AuthProvider>
@@ -1276,7 +1326,7 @@ export const App: React.FC = () => {
           />
           <Favicon />
           
-          {!isFocusMode && (
+          {!hideSiteHeader && (
              <>
                <ScrollProgress />
                <Header
@@ -1305,7 +1355,11 @@ export const App: React.FC = () => {
                 </Suspense>
               </>
             )}
-            <Breadcrumbs currentPage={currentPage} onNavigate={handlePageNavigate} />
+            {currentPathStr !== "/subscriptions" &&
+              currentPathStr !== "/products" &&
+              currentPathStr !== "/order" && (
+              <Breadcrumbs currentPage={currentPage} onNavigate={handlePageNavigate} />
+            )}
             <AnimateOnView>
               <LazyContent
                 onNavigate={handlePageNavigate}
@@ -1336,55 +1390,55 @@ export const App: React.FC = () => {
                 onNavigate={handlePageNavigate}
               />
               <Suspense fallback={null}>
-                <WhatsAppSupportDrawer />
                 <LogisticsDrawer />
                 <AuthModal />
               </Suspense>
 
-
-              {/* Floating Services Button */}
-              <button
-                onClick={() => handlePageNavigate("/corporate-booking")}
-                className="hidden md:flex fixed bottom-8 left-8 z-[100] bg-[#1A1A1A] hover:bg-black text-white p-4 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)] transition-all duration-300 hover:-translate-y-1 group items-center gap-2 border border-white/10"
-                aria-label="Corporate Services"
-              >
-                <span className="text-xl">🤝</span>
-                <span className="font-bold tracking-wide pr-1 text-base uppercase">
-                  Services
-                </span>
-              </button>
-
-              {/* Persistent Desktop Floating Actions */}
-              <div className="hidden md:flex fixed bottom-8 right-6 lg:right-10 z-[100] flex-col items-end gap-3 pointer-events-none">
-
+              {/* WhatsApp — opens chat directly (no intermediate drawer) */}
+              <div className="flex fixed bottom-20 md:bottom-8 right-4 md:right-6 lg:right-10 z-[400] flex-col items-end gap-3 pointer-events-none">
                 <a
-                  href={PORTAL_LINKS.subscribe}
-                  className="pointer-events-auto bg-[#1A1A1A] hover:bg-black text-white px-5 py-3.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)] transition-all duration-300 hover:-translate-y-1 group flex items-center gap-2.5 border border-white/10"
-                  aria-label="Subscribe"
+                  href={WHATSAPP_CONSULTATION_HREF}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="pointer-events-auto bg-[#25D366] hover:bg-[#20ba5a] text-white p-3.5 rounded-full shadow-[0_8px_30px_rgba(37,211,102,0.4)] border border-white/20 flex items-center justify-center transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+                  aria-label="24/7 WhatsApp Support"
                 >
-                  <div className="relative">
-                    <PackageOpen className="w-5 h-5 relative z-10 text-[#F59E0B]" />
-                  </div>
-                  <span className="font-bold tracking-wider text-sm uppercase">
-                    Subscribe
-                  </span>
+                  <WhatsAppIcon className="w-6 h-6 text-white" />
                 </a>
-                <SubscriptionQuickInfo className="pointer-events-auto mr-4" />
 
-                <a
-                  href={PORTAL_LINKS.order}
-                  className="pointer-events-auto bg-[#059669] hover:bg-[#047857] text-white px-6 py-4 rounded-full shadow-[0_8px_30px_rgba(5,150,105,0.4)] hover:shadow-[0_12px_40px_rgba(5,150,105,0.6)] transition-all duration-300 hover:-translate-y-1 group flex items-center gap-3 border border-white/20"
-                  aria-label="Order Now"
-                >
-                  <div className="relative">
-                    <ShoppingBag className="w-6 h-6 relative z-10" />
-                    <div className="absolute inset-0 bg-white/20 rounded-full blur-md group-hover:blur-xl transition-all duration-300"></div>
-                  </div>
-                  <span className="font-black tracking-widest text-base uppercase">
-                    Order Now
-                  </span>
-                </a>
+                {currentPathStr !== "/subscriptions" &&
+                  currentPathStr !== "/products" &&
+                  currentPathStr !== "/order" && (
+                  <button
+                    type="button"
+                    onClick={() => handlePageNavigate("/subscriptions")}
+                    className="pointer-events-auto hidden md:flex bg-[#1A1A1A] hover:bg-black text-white px-5 py-3.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)] transition-all duration-300 hover:-translate-y-1 group items-center gap-2.5 border border-white/10 cursor-pointer"
+                    aria-label="Subscribe"
+                  >
+                    <div className="relative">
+                      <PackageOpen className="w-5 h-5 relative z-10 text-[#F59E0B]" />
+                    </div>
+                    <span className="font-bold tracking-wider text-sm uppercase">
+                      Subscribe
+                    </span>
+                  </button>
+                )}
               </div>
+
+              {currentPathStr !== "/subscriptions" &&
+                currentPathStr !== "/products" &&
+                currentPathStr !== "/order" && (
+                <button
+                  onClick={() => handlePageNavigate("/corporate-booking")}
+                  className="hidden md:flex fixed bottom-8 left-8 z-[100] bg-[#1A1A1A] hover:bg-black text-white p-4 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)] transition-all duration-300 hover:-translate-y-1 group items-center gap-2 border border-white/10"
+                  aria-label="Corporate Services"
+                >
+                  <span className="text-xl">🤝</span>
+                  <span className="font-bold tracking-wide pr-1 text-base uppercase">
+                    Services
+                  </span>
+                </button>
+              )}
             </>
           )}
         </div>

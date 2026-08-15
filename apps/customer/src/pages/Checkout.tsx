@@ -192,6 +192,11 @@ export default function CheckoutPage() {
 
   const deliveryFee = selectedAddressArea?.deliveryFee || location.state?.deliveryFee || 0;
   const basePrice = selectedPlan?.offerPrice || selectedPlan?.price || 0;
+
+  // Dummy tiffin-box security deposit for first-time / new subscribers (details TBD)
+  const isFirstTimeOrder = !localStorage.getItem(`taaza_tiffin_deposit_paid_${currentUser?.uid || "guest"}`);
+  const TIFFIN_SECURITY_DEPOSIT = 299;
+  const securityDeposit = isFirstTimeOrder ? TIFFIN_SECURITY_DEPOSIT : 0;
   
   const discountAmount = useMemo(() => {
     if (!appliedCoupon) return 0;
@@ -201,8 +206,8 @@ export default function CheckoutPage() {
     return appliedCoupon.discountValue;
   }, [appliedCoupon, basePrice]);
 
-  const subtotal = basePrice - discountAmount + deliveryFee;
-  const taxes = Math.round(subtotal * 0.05);
+  const subtotal = basePrice - discountAmount + deliveryFee + securityDeposit;
+  const taxes = Math.round((basePrice - discountAmount + deliveryFee) * 0.05);
   const intermediateTotal = subtotal + taxes;
 
   const pointsValue = useMemo(() => {
@@ -217,6 +222,12 @@ export default function CheckoutPage() {
   }, [wallet, useWallet, intermediateTotal, pointsValue]);
 
   const total = Math.max(0, intermediateTotal - pointsValue - walletValue);
+
+  const markTiffinDepositPaid = () => {
+    if (securityDeposit > 0 && currentUser?.uid) {
+      localStorage.setItem(`taaza_tiffin_deposit_paid_${currentUser.uid}`, "1");
+    }
+  };
 
   const initiatePayment = async () => {
     if (!currentUser || !selectedAddressId) {
@@ -272,6 +283,7 @@ export default function CheckoutPage() {
         
         if (res.success) {
           setPaymentProgress(100);
+          markTiffinDepositPaid();
           showToast("Subscription Activated Successfully!", "success");
           navigate("/payment-success", { state: { orderNumber: res.orderNumber, planName: selectedPlan.name, amount: 0 } });
         }
@@ -311,9 +323,7 @@ export default function CheckoutPage() {
 
         if (verifyRes.success) {
           showToast("Sandbox Payment Successful!", "success");
-          
-
-
+          markTiffinDepositPaid();
           navigate("/payment-success", { 
             state: { 
               orderNumber: verifyRes.orderNumber || "ORD-" + mockPaymentId.slice(-6),
@@ -359,6 +369,7 @@ export default function CheckoutPage() {
 
             if (verifyRes.success) {
               showToast("Payment Successful!", "success");
+              markTiffinDepositPaid();
               navigate("/payment-success", { 
                  state: { 
                    orderNumber: verifyRes.orderNumber || "ORD-" + mockPaymentId.slice(-6),
@@ -415,6 +426,7 @@ export default function CheckoutPage() {
 
         if (verifyRes.success) {
           showToast("Sandbox Payment Successful!", "success");
+          markTiffinDepositPaid();
           navigate("/payment-success", { 
             state: { 
               orderNumber: verifyRes.orderNumber || "ORD-" + mockPaymentId.slice(-6),
@@ -1001,6 +1013,17 @@ export default function CheckoutPage() {
                         <span className="text-zinc-500 font-medium">Subtotal</span>
                         <span className="text-zinc-900 font-bold">₹{basePrice - discountAmount + deliveryFee}</span>
                       </div>
+                      {securityDeposit > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-zinc-500 font-medium flex items-center gap-1.5">
+                            Tiffin box security deposit
+                            <span className="text-[9px] uppercase bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
+                              First order
+                            </span>
+                          </span>
+                          <span className="text-zinc-900 font-bold">₹{securityDeposit}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-sm">
                         <span className="text-zinc-500 font-medium">Protocol Tax (5%)</span>
                         <span className="text-zinc-900 font-bold">₹{taxes}</span>

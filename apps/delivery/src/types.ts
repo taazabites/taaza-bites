@@ -6,7 +6,7 @@ declare global {
   }
 }
 
-export type OrderStatus = 
+export type OrderStatus =
   | "assigned"
   | "accepted"
   | "rejected"
@@ -16,6 +16,20 @@ export type OrderStatus =
   | "failed"
   | "returned";
 
+export type MealSlot = "Breakfast" | "Lunch" | "Dinner" | string;
+
+export type SlotTimingStatus = "on_time" | "running_late" | "delayed";
+
+export interface StructuredAddress {
+  type?: "Home" | "Office" | "Other";
+  flatNumber?: string;
+  building?: string;
+  floor?: string;
+  landmark?: string;
+  gateInstructions?: string;
+  securityInstructions?: string;
+}
+
 export interface DeliveryAssignment {
   id: string;
   orderId: string;
@@ -24,27 +38,35 @@ export interface DeliveryAssignment {
   customerName: string;
   customerPhone: string;
   customerAltPhone?: string;
+  customerPhotoUrl?: string;
   deliveryAddress: string;
+  addressDetails?: StructuredAddress;
   area: string;
   pincode: string;
   location: { lat: number; lng: number };
-  mealType: string;
+  mealType: MealSlot;
   mealItems: string[];
+  mealName?: string;
+  isVeg?: boolean;
   quantity: number;
   calories: string;
   protein: string;
   deliveryTimeSlot: string;
+  /** e.g. "12/30" */
+  subscriptionDay?: string;
   kitchenNotes?: string;
   customerNotes?: string;
   status: OrderStatus;
   paymentStatus: "paid" | "cod";
   deliveryOTP: string;
   isPriority: boolean;
+  routeOrder?: number;
   createdAt: number;
   updatedAt: number;
   rejectReason?: string;
   failureReason?: string;
   deliveryPhotoUrl?: string;
+  cantReachAttempts?: number;
 }
 
 export interface PartnerStats {
@@ -59,3 +81,28 @@ export interface PartnerStats {
   completedKm: number;
   workingHours: number;
 }
+
+export interface PartnerIssueReport {
+  id?: string;
+  partnerId: string;
+  partnerName?: string;
+  type:
+    | "vehicle"
+    | "accident"
+    | "food_damaged"
+    | "wrong_package"
+    | "customer_unavailable"
+    | "address_issue"
+    | "kitchen_delay"
+    | "traffic"
+    | "location_mismatch"
+    | "other";
+  message: string;
+  assignmentId?: string;
+  location?: { lat: number; lng: number };
+  createdAt: number;
+  status: "open" | "acknowledged" | "resolved";
+}
+
+/** Dummy tiffin-box security deposit (customer can change later) */
+export const TIFFIN_SECURITY_DEPOSIT_INR = 299;

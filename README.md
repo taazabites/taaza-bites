@@ -232,6 +232,12 @@ When Firebase Admin credentials are missing, role resolution falls back to clien
 
 ---
 
+## Demo logins (local)
+
+One-click demo access for Super Admin, Admin, Customer, and Delivery Partner is documented in [`DEMO_LOGINS.md`](./DEMO_LOGINS.md).
+
+---
+
 ## Roadmap (optional)
 
 - [ ] Unify named Firestore databases into a single shared data plane  

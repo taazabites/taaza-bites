@@ -23,7 +23,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentPath, o
         { path: '/', icon: Home, label: 'Home' },
         { path: '/corporate-booking', icon: Building2, label: 'Corporate' },
         { href: PORTAL_LINKS.order, icon: ShoppingBag, label: 'Order', isAction: true },
-        { href: PORTAL_LINKS.subscribe, icon: PackageOpen, label: 'Subscribe', isAccent: true }
+        { path: '/subscriptions', icon: PackageOpen, label: 'Subscribe', isAccent: true }
     ];
 
     return (

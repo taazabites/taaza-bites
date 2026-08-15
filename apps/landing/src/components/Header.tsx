@@ -61,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate }) => {
   const primaryLinks = [
     { name: "Home", path: "/" },
     { name: "Our Menu", path: "/menu" },
-    { name: "Meal Plans", path: "/subscriptions" },
+    { name: "Subscriptions", path: "/subscriptions" },
     { name: "Free Assessment", path: "/health-assessment" },
   ];
 
@@ -236,15 +236,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate }) => {
                   Sign in
                 </button>
               )}
-              <div className="flex flex-col items-center">
-                <SmartButton
-                  label="Subscribe"
-                  href={PORTAL_LINKS.subscribe}
-                  variant="secondary"
-                  className={`shadow-sm hover:shadow-md transition-all px-3 py-2 text-sm ${isHeaderSolid && !isDarkPage ? "bg-white text-gray-900 border-gray-200" : "bg-white/10 text-white border-white/20 hover:bg-white/20"}`}
-                />
-                <SubscriptionQuickInfo className="mt-1" />
-              </div>
+              <SubscriptionQuickInfo className="mt-0" />
               <SmartButton
                 label="Order Now"
                 href={PORTAL_LINKS.order}
@@ -384,8 +376,8 @@ export const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate }) => {
               {user ? 'Portals' : 'Sign in'}
             </button>
             <SmartButton
-              label="Subscribe"
-              href={PORTAL_LINKS.subscribe}
+              label="Order Now"
+              href={PORTAL_LINKS.order}
               variant="primary"
               className="w-full justify-center shadow-md py-3.5 sm:py-4 text-[13px] sm:text-sm font-bold border-transparent bg-[#059669] text-white hover:bg-[#047857]"
               onClick={() => setIsMobileMenuOpen(false)}

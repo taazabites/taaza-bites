@@ -88,6 +88,7 @@ const CorporatePage = lazyWithRetry(() => import("./pages/corporate"))
 const PerformancePage = lazyWithRetry(() => import("./pages/performance"))
 const QATestPage = lazyWithRetry(() => import("./pages/qa-test"))
 const AIDashboardPage = lazyWithRetry(() => import("./pages/ai-dashboard"))
+const CrmCommandCenterPage = lazyWithRetry(() => import("./pages/crm-command-center"))
 const UnauthorizedPage = lazyWithRetry(() => import("./pages/unauthorized"))
 const NotFoundPage = lazyWithRetry(() => import("./pages/not-found"))
 
@@ -228,6 +229,7 @@ export default function App() {
                 <Route path="/audit-logs" element={<ErrorBoundary><AuditLogsPage /></ErrorBoundary>} />
                 <Route path="/qa-test" element={<ErrorBoundary><QATestPage /></ErrorBoundary>} />
                 <Route path="/ai-dashboard" element={<ErrorBoundary><AIDashboardPage /></ErrorBoundary>} />
+                <Route path="/crm-command" element={<ErrorBoundary><CrmCommandCenterPage /></ErrorBoundary>} />
 
                 {/* Convenience Aliases */}
                 <Route path="/health" element={<Navigate to="/customers/health" replace />} />

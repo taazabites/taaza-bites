@@ -12,20 +12,27 @@ import {
   setPersistence,
   browserLocalPersistence
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { auth, db } from '../lib/firebase';
-import { User, Role } from '../types';
+import { User } from '../types';
 import { dbSeedService } from '../services/db-seed';
 import { systemMonitoringService } from '../services/system-monitoring';
 import { AutoLogoutWarningModal } from '../components/auth/AutoLogoutWarningModal';
 import { buildSuperAdminProfile, isSuperAdminEmail } from '../lib/super-admin';
 import { resolveOrClaimAdminProfile } from '../lib/resolve-admin-profile';
+import {
+  ALLOW_SIMULATED_AUTH,
+  DEMO_ADMIN,
+  DEMO_STORAGE_KEY,
+  DEMO_SUPER_ADMIN,
+} from '../lib/demo-credentials';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password?: string) => Promise<void>;
+  loginDemo: (role: 'Super Admin' | 'Admin') => Promise<void>;
   loginWithGoogle: (useRedirect?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -33,6 +40,7 @@ interface AuthContextType {
   triggerSessionWarning: () => void;
   sessionRemainingSeconds: number | null;
   isSessionWarningOpen: boolean;
+  allowDemoLogin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,8 +57,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+    // Restore local demo session (no Firebase Auth required)
+    if (ALLOW_SIMULATED_AUTH) {
+      try {
+        const raw = localStorage.getItem(DEMO_STORAGE_KEY);
+        if (raw) {
+          const demo = JSON.parse(raw) as User;
+          if (demo?.id && demo?.role) {
+            setUser(demo);
+            setSessionExpiresAt(Date.now() + 8 * 60 * 60 * 1000);
+            setLoading(false);
+          }
+        }
+      } catch {
+        localStorage.removeItem(DEMO_STORAGE_KEY);
+      }
+    } else {
+      localStorage.removeItem(DEMO_STORAGE_KEY);
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
+        localStorage.removeItem(DEMO_STORAGE_KEY);
         try {
           const profile = await resolveOrClaimAdminProfile(
             firebaseUser.uid,
@@ -86,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           setSessionExpiresAt(null);
         }
-      } else {
+      } else if (!localStorage.getItem(DEMO_STORAGE_KEY)) {
         setUser(null);
         setSessionExpiresAt(null);
       }
@@ -242,6 +271,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const applySimulatedDemo = (role: 'Super Admin' | 'Admin') => {
+    const source = role === 'Super Admin' ? DEMO_SUPER_ADMIN : DEMO_ADMIN;
+    const profile: User = {
+      id: `sim_${role === 'Super Admin' ? 'superadmin' : 'admin'}`,
+      email: source.email,
+      name: source.name,
+      role: source.role,
+      status: 'Active',
+      createdAt: new Date().toISOString(),
+    };
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(profile));
+    setUser(profile);
+    setSessionExpiresAt(Date.now() + 8 * 60 * 60 * 1000);
+    if (import.meta.env.DEV) {
+      dbSeedService.ensureSeeded().catch(console.error);
+    }
+    toast.success(`Demo ${role} session ready`);
+  };
+
+  /** One-click demo: try Firebase Auth users, fall back to local simulated session */
+  const loginDemo = async (role: 'Super Admin' | 'Admin') => {
+    if (!ALLOW_SIMULATED_AUTH) {
+      throw new Error('Demo login is disabled. Set VITE_ALLOW_SIMULATED_AUTH=true');
+    }
+
+    const source = role === 'Super Admin' ? DEMO_SUPER_ADMIN : DEMO_ADMIN;
+
+    try {
+      let credential;
+      try {
+        credential = await signInWithEmailAndPassword(auth, source.email, source.password);
+      } catch {
+        credential = await createUserWithEmailAndPassword(auth, source.email, source.password);
+      }
+
+      let profile = await resolveOrClaimAdminProfile(
+        credential.user.uid,
+        source.email,
+        source.name
+      );
+
+      if (!profile && role === 'Admin') {
+        profile = {
+          id: credential.user.uid,
+          email: source.email,
+          name: source.name,
+          role: 'Admin',
+          status: 'Active',
+          createdAt: new Date().toISOString(),
+        };
+        await setDoc(doc(db, 'admins', credential.user.uid), profile, { merge: true });
+      }
+
+      if (!profile && role === 'Super Admin') {
+        profile = buildSuperAdminProfile(credential.user.uid, source.email, source.name) as User;
+        await setDoc(doc(db, 'admins', credential.user.uid), profile, { merge: true });
+      }
+
+      if (!profile) {
+        throw new Error('Could not resolve admin profile');
+      }
+
+      localStorage.removeItem(DEMO_STORAGE_KEY);
+      setUser(profile);
+      setSessionExpiresAt(Date.now() + 30 * 60 * 1000);
+      if (import.meta.env.DEV) {
+        dbSeedService.ensureSeeded().catch(console.error);
+      }
+      toast.success(`Signed in as ${role}`);
+    } catch (err) {
+      console.warn('Firebase demo login unavailable, using local simulated session:', err);
+      applySimulatedDemo(role);
+    }
+  };
+
   const logout = async () => {
     try {
       const sessId = localStorage.getItem('admin_session_id');
@@ -256,7 +360,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (logoutLogErr) {
       console.error("Failed to log logout session:", logoutLogErr);
     }
-    await signOut(auth);
+    localStorage.removeItem(DEMO_STORAGE_KEY);
+    setUser(null);
+    setSessionExpiresAt(null);
+    try {
+      await signOut(auth);
+    } catch {
+      /* ignore if already signed out / demo-only */
+    }
   };
 
   const loginWithGoogle = async (useRedirect = false) => {
@@ -304,14 +415,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{ 
       user, 
       loading, 
-      login, 
+      login,
+      loginDemo,
       loginWithGoogle, 
       logout, 
       resetPassword,
       extendSession,
       triggerSessionWarning,
       sessionRemainingSeconds: sessionRemaining,
-      isSessionWarningOpen: showWarningModal
+      isSessionWarningOpen: showWarningModal,
+      allowDemoLogin: ALLOW_SIMULATED_AUTH,
     }}>
       {children}
       {user && (

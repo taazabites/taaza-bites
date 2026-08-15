@@ -234,6 +234,7 @@ const navItems: NavItem[] = [
       { title: "Business Intelligence", href: "/bi" },
       { title: "Performance Dashboard", href: "/performance" },
       { title: "AI Insights Dashboard", href: "/ai-dashboard" },
+      { title: "AI CRM Command Center", href: "/crm-command" },
     ]
   }
 ];

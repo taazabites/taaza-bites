@@ -50,7 +50,7 @@ const BENEFIT_DETAILS: Record<string, MacroBenefit> = {
     }
 };
 
-export const SubscriptionQuickInfo: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => {
+export const SubscriptionQuickInfo: React.FC<{ className?: string; style?: React.CSSProperties; label?: string }> = ({ className, style, label = "Quick Info & Active Plan Macros" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [hoveredFactIndex, setHoveredFactIndex] = useState<number | null>(null);
@@ -107,7 +107,7 @@ export const SubscriptionQuickInfo: React.FC<{ className?: string; style?: React
                     className="text-[10px] uppercase tracking-widest text-zinc-400 hover:text-[#059669] transition-all duration-300 flex items-center justify-center gap-1.5 mx-auto sm:mx-0 group py-1.5 px-3 bg-white/5 rounded-full border border-white/5 hover:border-[#059669]/30"
                 >
                     <Info className="w-3 h-3 transition-transform group-hover:rotate-12 text-[#059669]" />
-                    <span>Quick Info & Active Plan Macros</span>
+                    <span>{label}</span>
                 </button>
                 
                 {/* Active Plan Hover Tooltip */}
@@ -115,11 +115,11 @@ export const SubscriptionQuickInfo: React.FC<{ className?: string; style?: React
                     {isHovered && (
                         <motion.div
                             layout
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            initial={{ opacity: 0, y: -8, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            exit={{ opacity: 0, y: -8, scale: 0.95 }}
                             transition={{ duration: 0.2 }}
-                            className="absolute bottom-full left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0 mb-3 w-80 bg-[#141414] border border-[#059669]/30 p-5 rounded-2xl shadow-[0_15px_30px_rgba(0,0,0,0.6)] z-[999] pointer-events-auto backdrop-blur-md"
+                            className="absolute top-full left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0 mt-3 w-80 bg-[#141414] border border-[#059669]/30 p-5 rounded-2xl shadow-[0_15px_30px_rgba(0,0,0,0.6)] z-[999] pointer-events-auto backdrop-blur-md"
                             onMouseEnter={() => setIsHovered(true)}
                             onMouseLeave={() => setIsHovered(false)}
                         >

@@ -796,6 +796,19 @@ export default function LoginOTP() {
                   )}
                 </motion.button>
 
+                {loginSimulated && (
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={handleSimulatedLogin}
+                    disabled={loading}
+                    className="w-full h-12 border-2 border-dashed border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800 rounded-2xl font-extrabold text-xs uppercase tracking-widest transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    Enter Demo Customer Dashboard
+                  </motion.button>
+                )}
+
                 {/* Divider */}
                 <div className="relative flex items-center py-1">
                   <div className="flex-grow border-t border-slate-200"></div>

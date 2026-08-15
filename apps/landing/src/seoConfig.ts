@@ -35,6 +35,20 @@ export const seoConfig: { [key: string]: PageMetadata } = {
     twitterImage:
       "https://cdn.urbanpiper.com/media/bizmedia/2026/06/19/HhPpnu-77502065-30b6-43ea-b959-146b6537957d.jpg",
   },
+  "/products": {
+    title: "Healthy Meal Products & Categories | Taazabites Bengaluru",
+    description:
+      "Browse Breakfast, Indian Home Style, Fat Loss, Cold Pressed Juices, and Muscle Gain meals. Buy once or subscribe with Taazabites.",
+    canonical: "https://www.taazabites.in/products",
+    breadcrumbName: "Products",
+  },
+  "/order": {
+    title: "Order Now — Build Your Meal | Taazabites Bengaluru",
+    description:
+      "Set your meal and build it fast. Browse bowls, pasta, proteins, sides, and more with full macro details from Taazabites.",
+    canonical: "https://www.taazabites.in/order",
+    breadcrumbName: "Order Now",
+  },
   "/corporate-booking": {
     title:
       "Corporate Wellness Catering Bangalore | Taazabites",
