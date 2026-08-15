@@ -62,7 +62,7 @@ export default function OrdersPage() {
   const defaultStatus = location.pathname.includes('/orders/pending') ? 'Pending' :
                         location.pathname.includes('/orders/preparing') ? 'Preparing' :
                         location.pathname.includes('/orders/packed') ? 'Packed' :
-                        location.pathname.includes('/orders/delivery') ? 'Out For Delivery' :
+                        location.pathname.includes('/orders/out') ? 'Out For Delivery' :
                         location.pathname.includes('/orders/delivered') ? 'Delivered' :
                         location.pathname.includes('/orders/cancelled') ? 'Cancelled' : 'All';
 

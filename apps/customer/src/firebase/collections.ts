@@ -12,16 +12,27 @@ export interface User {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   lastLogin: Timestamp;
+  lastActivityAt?: Timestamp;
   referralCode?: string;
   walletBalance: number;
   rewardPoints: number;
   hasActiveSubscription?: boolean;
+  retentionState?: 'healthy' | 'at_risk' | 'expiring' | 'churned';
+  skippedMealsCount?: number;
+  complaintCount?: number;
+  renewalProbability?: number;
+  mealsCompleted?: number;
+  mealsRemaining?: number;
+  nextDeliveryDate?: Timestamp | string;
+  currentPlanId?: string;
+  currentSubscriptionId?: string;
 }
 
 
 export interface SubscriptionPlan {
   id: string;
   name: string;
+  planName?: string;
   description: string;
   price: number;
   offerPrice: number;
@@ -35,10 +46,12 @@ export interface SubscriptionPlan {
   goal: string;
   mealTypes: string[];
   features: string[];
+  savings?: number;
   popular: boolean;
   active: boolean;
   isAvailable?: boolean;
   displayOrder: number;
+  sortOrder?: number;
   image: string;
   deliverySchedule?: string;
   icon?: string;
@@ -47,23 +60,60 @@ export interface SubscriptionPlan {
   updatedAt: Timestamp;
 }
 
+export type SubscriptionStatus =
+  | 'pending'
+  | 'active'
+  | 'paused'
+  | 'expiring'
+  | 'expired'
+  | 'cancelled'
+  | 'payment_failed'
+  | 'draft';
+
+export interface PlanSnapshot {
+  id: string;
+  planName: string;
+  description?: string;
+  price: number;
+  offerPrice: number;
+  duration?: number;
+  durationDays: number;
+  mealsPerDay: number;
+  totalMeals: number;
+  calories?: number;
+  protein?: number;
+  deliverySchedule?: string;
+  features?: string[];
+  savings?: number;
+}
+
 export interface Subscription {
   id: string;
   userId: string;
+  customerId?: string;
   planId: string;
   planName?: string;
+  planSnapshot?: PlanSnapshot;
+  assessmentId?: string;
   caloriesTarget?: number;
-  status: 'active' | 'paused' | 'expired' | 'cancelled' | 'draft';
+  status: SubscriptionStatus;
   startDate: Timestamp;
   endDate: Timestamp;
+  totalMeals?: number;
+  mealsCompleted?: number;
+  mealsRemaining?: number;
   remainingMeals: number;
   daysRemaining?: number;
   paused: boolean;
   pauseHistory: any[];
   paymentId: string;
+  razorpaySubscriptionId?: string;
   deliveryTime: string;
   deliveryTiming?: string;
   deliveryAddressId: string;
+  deliveryAddress?: Record<string, any>;
+  nextDeliveryDate?: Timestamp | string;
+  mealPreference?: string[];
   mealsPerDay?: number;
   healthAssessmentCompleted?: boolean;
   healthAssessmentId?: string;
@@ -86,6 +136,8 @@ export interface HealthAssessment {
   goal: string;
   dietPreference?: string;
   dietaryPreference?: string;
+  mealsPerDay?: number;
+  preferredDeliveryTime?: string;
   mealPreference: string[];
   activityLevel: string;
   workoutFrequency?: string;
@@ -477,11 +529,26 @@ export interface Delivery {
   id: string;
   userId: string;
   orderId: string;
+  subscriptionId?: string;
+  mealType?: string;
+  deliveryDate?: Timestamp | string;
+  deliveryAddress?: Record<string, any>;
   partnerName?: string;
-  deliveryStatus: 'Assigned' | 'OutForDelivery' | 'Delivered';
+  partnerPhone?: string;
+  deliveryStatus: 'preparing' | 'packed' | 'out_for_delivery' | 'delivered' | 'Assigned' | 'OutForDelivery' | 'Delivered' | string;
   eta?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+export interface SubscriptionEvent {
+  id: string;
+  customerId: string;
+  userId: string;
+  subscriptionId: string;
+  type: string;
+  payload?: Record<string, unknown>;
+  createdAt: Timestamp;
 }
 
 export interface MarketingCampaign {

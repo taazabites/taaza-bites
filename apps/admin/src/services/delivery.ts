@@ -14,9 +14,42 @@ import {
   serverTimestamp,
   getDocs
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { DeliveryPartner, DeliveryRoute, Delivery } from '../types';
 import { auditService } from './audit';
+
+function mapAdminDeliveryStatus(raw: unknown): Delivery['status'] {
+  const s = String(raw || 'Pending').toUpperCase().replace(/[\s-]+/g, '_');
+  if (s === 'ASSIGNED' || s === 'ACCEPTED' || s === 'PENDING') return 'Assigned';
+  if (s === 'PICKED_UP') return 'Picked Up';
+  if (s === 'OUT_FOR_DELIVERY' || s === 'ARRIVED') return 'Out For Delivery';
+  if (s === 'DELIVERED') return 'Delivered';
+  if (s === 'FAILED') return 'Failed';
+  if (s === 'RETURN_TO_KITCHEN' || s === 'RETURNED') return 'Returned';
+  if (s === 'CANCELLED') return 'Cancelled';
+  return (raw as Delivery['status']) || 'Pending';
+}
+
+async function opsFetch(path: string, init: RequestInit & { body?: unknown } = {}) {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(path, {
+    method: init.method || 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: token ? `Bearer ${token}` : '',
+    },
+    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error((data as { error?: string }).error || `Request failed (${res.status})`) as Error & {
+      status?: number;
+    };
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
 
 export const deliveryService = {
   /**
@@ -34,7 +67,7 @@ export const deliveryService = {
           fullName: data.fullName || data.name || '',
           phone: data.phone || '',
           email: data.email || '',
-          profilePhoto: data.profilePhoto || '',
+          profilePhoto: data.profilePhoto || data.photoUrl || data.photo || '',
           vehicleType: data.vehicleType || data.vehicle || '',
           vehicleNumber: data.vehicleNumber || '',
           licenseNumber: data.licenseNumber || '',
@@ -43,7 +76,9 @@ export const deliveryService = {
           emergencyContact: data.emergencyContact || '',
           status: data.status || 'Active',
           availability: data.availability || 'Available',
-          rating: data.rating ?? 4.5,
+          currentStatus: data.currentStatus || '',
+          serviceAreas: Array.isArray(data.serviceAreas) ? data.serviceAreas : [],
+          rating: typeof data.rating === 'number' ? data.rating : 0,
           completedDeliveries: data.completedDeliveries ?? 0,
           assignedOrders: data.assignedOrders ?? 0,
           createdAt: data.createdAt || '',
@@ -107,7 +142,7 @@ export const deliveryService = {
           deliverySlot: data.deliverySlot || '',
           driverId: data.driverId || '',
           driverName: data.driverName || '',
-          status: data.status || 'Pending',
+          status: mapAdminDeliveryStatus(data.opStatus || data.status),
           estimatedArrival: data.estimatedArrival || '',
           proofImage: data.proofImage || '',
           notes: data.notes || '',
@@ -130,27 +165,35 @@ export const deliveryService = {
     adminEmail: string
   ): Promise<void> {
     const now = new Date().toISOString();
-    const partnerCollection = collection(db, 'deliveryPartners');
-    const docRef = doc(partnerCollection);
-    
-    const newPartner = {
-      partnerId: docRef.id,
-      ...partner,
-      name: partner.fullName, // for backward compatibility with orders.ts
-      completedDeliveries: 0,
-      assignedOrders: 0,
-      rating: 5.0,
-      createdAt: now,
-      updatedAt: now
-    };
+    try {
+      await opsFetch('/api/delivery/partners', {
+        method: 'POST',
+        body: { ...partner, fullName: partner.fullName },
+      });
+    } catch (err) {
+      const partnerCollection = collection(db, 'deliveryPartners');
+      const docRef = doc(partnerCollection);
+      const newPartner = {
+        partnerId: docRef.id,
+        ...partner,
+        name: partner.fullName,
+        completedDeliveries: 0,
+        assignedOrders: 0,
+        rating: 0,
+        currentStatus: 'OFFLINE',
+        createdAt: now,
+        updatedAt: now,
+      };
+      await setDoc(docRef, newPartner);
+      console.warn('Partner API unavailable, wrote admin DB only', err);
+    }
 
-    await setDoc(docRef, newPartner);
     await auditService.logAction(
       adminId,
       adminEmail,
       'CREATE',
-      `Delivery Partner ${newPartner.fullName}`,
-      `Added new delivery partner ${newPartner.fullName} with phone ${newPartner.phone}`
+      `Delivery Partner ${partner.fullName}`,
+      `Added new delivery partner ${partner.fullName} with phone ${partner.phone}`
     );
   },
 
@@ -164,17 +207,15 @@ export const deliveryService = {
     adminEmail: string
   ): Promise<void> {
     const now = new Date().toISOString();
-    const docRef = doc(db, 'deliveryPartners', id);
-    
-    const updateData: any = {
-      ...partner,
-      updatedAt: now
-    };
-    if (partner.fullName) {
-      updateData.name = partner.fullName; // backward compatibility
+    try {
+      await opsFetch(`/api/delivery/partners/${id}`, { method: 'PATCH', body: partner });
+    } catch (err) {
+      const docRef = doc(db, 'deliveryPartners', id);
+      const updateData: Record<string, unknown> = { ...partner, updatedAt: now };
+      if (partner.fullName) updateData.name = partner.fullName;
+      await updateDoc(docRef, updateData);
+      console.warn('Partner API unavailable, wrote admin DB only', err);
     }
-
-    await updateDoc(docRef, updateData);
     await auditService.logAction(
       adminId,
       adminEmail,
@@ -301,30 +342,48 @@ export const deliveryService = {
     adminId: string,
     adminEmail: string
   ): Promise<void> {
-    const batch = writeBatch(db);
-    
-    // Update delivery records
-    for (const orderId of orderIds) {
-      const q = query(collection(db, 'deliveries'), where('orderId', '==', orderId));
-      const snapshot = await getDocs(q);
-      
-      let deliveryDocRef;
-      if (!snapshot.empty) {
-        deliveryDocRef = snapshot.docs[0].ref;
-      } else {
-        deliveryDocRef = doc(collection(db, 'deliveries'));
+    try {
+      await opsFetch('/api/delivery/assign', {
+        method: 'POST',
+        body: {
+          partnerId: driverId,
+          partnerName: driverName,
+          orderIds,
+          routeId,
+          routeName,
+          estimatedTime,
+          reassign: true,
+        },
+      });
+    } catch (err) {
+      console.warn('Assign API unavailable, writing admin DB only', err);
+      const batch = writeBatch(db);
+      for (const orderId of orderIds) {
+        const q = query(collection(db, 'deliveries'), where('orderId', '==', orderId));
+        const snapshot = await getDocs(q);
+        const deliveryDocRef = snapshot.empty ? doc(collection(db, 'deliveries')) : snapshot.docs[0].ref;
+        batch.set(
+          deliveryDocRef,
+          {
+            orderId,
+            driverId,
+            driverName,
+            status: 'Assigned',
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
       }
-      
-      batch.set(deliveryDocRef, {
-        orderId,
-        driverId,
-        driverName,
-        status: 'Assigned',
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+      await batch.commit();
     }
-    
-    await batch.commit();
+
+    await auditService.logAction(
+      adminId,
+      adminEmail,
+      'UPDATE',
+      'Delivery assignment',
+      `Assigned ${orderIds.length} orders to ${driverName}`
+    );
   },
 
   /**

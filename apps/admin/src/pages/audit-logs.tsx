@@ -758,7 +758,7 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6 md:p-8" id="audit-logs-module">
+    <div className="text-zinc-100" id="audit-logs-module">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>

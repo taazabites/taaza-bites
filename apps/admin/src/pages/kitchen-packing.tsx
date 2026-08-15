@@ -155,7 +155,7 @@ export default function KitchenPackingPage() {
   const packed = packing.filter(p => p.packagingStatus === 'Packed').length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-5">

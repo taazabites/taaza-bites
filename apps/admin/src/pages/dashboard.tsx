@@ -46,7 +46,8 @@ import {
   Cell,
   Legend
 } from "recharts"
-import { dashboardService, DashboardMetrics } from "../services/dashboard"
+import { DashboardMetrics, isPermissionDenied, loadDashboardMetrics, AttentionItem } from "../services/dashboard"
+import { presetRange, DatePreset, formatInr } from "../lib/dates"
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { PerformanceMetricsCard } from "../components/dashboard/performance-metrics-card"
@@ -54,6 +55,10 @@ import { PerformanceMetricsCard } from "../components/dashboard/performance-metr
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [liveDataBlocked, setLiveDataBlocked] = useState(false);
+  const [preset, setPreset] = useState<DatePreset>("today");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
 
   // System Health Monitor States
   const [firebaseStatus, setFirebaseStatus] = useState<'healthy' | 'checking' | 'error'>('checking')
@@ -80,8 +85,12 @@ export default function DashboardPage() {
     } catch (err: any) {
       console.error("Firebase health check error code:", err.code);
       console.error("Firebase health check error message:", err.message);
-      console.error("Firebase health check full error:", err);
-      setFirebaseStatus('error')
+      if (isPermissionDenied(err)) {
+        setFirebaseStatus('healthy')
+        setLiveDataBlocked(true)
+      } else {
+        setFirebaseStatus('error')
+      }
     }
 
     // 2. Razorpay connection check (real network request)
@@ -127,15 +136,31 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    const unsubscribe = dashboardService.subscribeToMetrics(
-      (data) => {
-        setMetrics(data);
-        setError(null);
-      },
-      (err) => setError(err.message)
+    let cancelled = false;
+    const range = presetRange(
+      preset,
+      customStart ? new Date(customStart) : undefined,
+      customEnd ? new Date(customEnd) : undefined
     );
-    return () => unsubscribe();
-  }, []);
+    loadDashboardMetrics(range)
+      .then((data) => {
+        if (!cancelled) {
+          setMetrics(data);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (isPermissionDenied(err)) {
+          setLiveDataBlocked(true);
+          setError(null);
+          return;
+        }
+        setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preset, customStart, customEnd]);
 
   useEffect(() => {
     // Run the health check slightly later so the UI loads instantly without blockages
@@ -169,16 +194,14 @@ export default function DashboardPage() {
   }
 
   const kpis = [
-    { title: "Total Customers", value: metrics.totalCustomers.toLocaleString(), icon: Users, color: "text-blue-500", bg: "bg-blue-500/10", trend: "+5%" },
-    { title: "Active Subscriptions", value: metrics.activeSubscribers.toLocaleString(), icon: CreditCard, color: "text-indigo-500", bg: "bg-indigo-500/10", trend: "+2%" },
-    { title: "Today's Orders", value: metrics.todaysOrders.toLocaleString(), icon: ClipboardList, color: "text-emerald-500", bg: "bg-emerald-500/10", trend: "+12%" },
-    { title: "Revenue Today", value: `₹${metrics.todaysRevenue.toLocaleString()}`, icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/10", trend: "+8.2%" },
-    { title: "Monthly Revenue", value: `₹${metrics.monthlyRevenue.toLocaleString()}`, icon: TrendingUp, color: "text-blue-500", bg: "bg-blue-500/10", trend: "+15%" },
-    { title: "Pending Orders", value: metrics.pendingOrders.toString(), icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", trend: "-5" },
-    { title: "Kitchen Queue", value: metrics.kitchenQueue.toString(), icon: ChefHat, color: "text-rose-500", bg: "bg-rose-500/10", trend: null },
-    { title: "Delivery in Progress", value: metrics.liveDeliveries.toString(), icon: Truck, color: "text-purple-500", bg: "bg-purple-500/10", trend: null },
-    { title: "Low Inventory", value: metrics.lowStockAlerts.toString(), icon: AlertOctagon, color: "text-rose-500", bg: "bg-rose-500/10", trend: null },
-    { title: "Support Tickets", value: metrics.supportTickets.toString(), icon: LifeBuoy, color: "text-amber-500", bg: "bg-amber-500/10", trend: "+2" },
+    { title: "Today's Orders", value: metrics.todaysOrders.toLocaleString(), icon: ClipboardList, color: "text-emerald-500", bg: "bg-emerald-500/10", trend: metrics.trendOrders },
+    { title: "Today's Revenue", value: formatInr(metrics.todaysRevenue), icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/10", trend: metrics.trendRevenue },
+    { title: "Active Subscriptions", value: metrics.activeSubscribers.toLocaleString(), icon: CreditCard, color: "text-indigo-500", bg: "bg-indigo-500/10", trend: null },
+    { title: "New Customers", value: metrics.newCustomers.toLocaleString(), icon: Users, color: "text-blue-500", bg: "bg-blue-500/10", trend: null },
+    { title: "Renewals Due", value: metrics.renewalsDue.toString(), icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", trend: null },
+    { title: "Pending Deliveries", value: metrics.pendingDeliveries.toString(), icon: Truck, color: "text-purple-500", bg: "bg-purple-500/10", trend: null },
+    { title: "Failed Payments", value: metrics.failedPayments.toString(), icon: AlertOctagon, color: "text-rose-500", bg: "bg-rose-500/10", trend: null },
+    { title: "At-Risk Customers", value: metrics.atRiskCustomers.toString(), icon: Activity, color: "text-orange-500", bg: "bg-orange-500/10", trend: null },
   ]
 
   const container = {
@@ -203,24 +226,47 @@ export default function DashboardPage() {
       variants={container}
       className="space-y-6 pb-12"
     >
+      {liveDataBlocked && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Live Firestore reads are blocked for this session (rules or demo login without Firebase Auth).
+          KPI cards stay at zero until a staff Firebase account with an <code className="text-amber-200">admins/&#123;uid&#125;</code> profile is used, and rules are deployed.
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <motion.div variants={item}>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Real-time overview of operations and performance.</p>
         </motion.div>
-        <motion.div variants={item} className="flex items-center gap-2">
+        <motion.div variants={item} className="flex flex-wrap items-center gap-2">
+          {([
+            ["today", "Today"],
+            ["yesterday", "Yesterday"],
+            ["7d", "7 Days"],
+            ["30d", "30 Days"],
+            ["custom", "Custom"],
+          ] as [DatePreset, string][]).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setPreset(key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${preset === key ? "bg-emerald-600 text-zinc-950 border-emerald-500" : "border-zinc-800 text-zinc-400"}`}
+            >
+              {label}
+            </button>
+          ))}
+          {preset === "custom" && (
+            <>
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs" />
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs" />
+            </>
+          )}
           <HeartbeatIndicator />
-          <div className="bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-semibold border border-primary/20 flex items-center gap-2 shadow-sm shadow-primary/5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            </span>
-            Live Updates
-          </div>
         </motion.div>
       </div>
 
       {/* KPI Cards */}
+      {metrics.truncated && (
+        <p className="text-xs text-amber-300/80">KPI window uses the latest 400 documents per collection so the dashboard does not scan the full history on the client.</p>
+      )}
       <motion.div variants={item} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi, i) => (
           <Card key={kpi.title} className="glass-card group hover:border-primary/30 transition-all duration-300 relative overflow-hidden">
@@ -236,7 +282,7 @@ export default function DashboardPage() {
             <CardContent className="relative z-10 flex items-end justify-between">
               <div className="text-2xl font-bold text-foreground tracking-tight">{kpi.value}</div>
               {kpi.trend && (
-                <div className={`flex items-center gap-1 text-xs font-semibold ${kpi.trend.startsWith('+') ? 'text-emerald-500' : 'text-rose-500'}`}>
+                <div className={`flex items-center gap-1 text-xs font-semibold ${kpi.trend.startsWith('+') ? 'text-emerald-500' : kpi.trend.startsWith('-') ? 'text-rose-500' : 'text-zinc-500'}`}>
                   {kpi.trend.startsWith('+') ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                   {kpi.trend}
                 </div>
@@ -343,23 +389,26 @@ export default function DashboardPage() {
         <div className="col-span-full lg:col-span-2 space-y-6">
           <Card className="glass-card">
             <CardHeader>
-              <CardTitle className="text-foreground text-lg">Notifications</CardTitle>
+              <CardTitle className="text-foreground text-lg">Needs Attention</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-start gap-3 p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                <AlertOctagon className="h-5 w-5 text-amber-500 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-500">Low Stock Alert</p>
-                  <p className="text-xs text-muted-foreground">Inventory for Paneer is running low.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                <CreditCard className="h-5 w-5 text-emerald-500 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-emerald-500">New Order</p>
-                  <p className="text-xs text-muted-foreground">Order #12345 placed by Customer X.</p>
-                </div>
-              </div>
+            <CardContent className="space-y-3 max-h-[360px] overflow-y-auto">
+              {(metrics.attention || []).length === 0 && (
+                <p className="text-sm text-muted-foreground">Nothing urgent in the current Firestore window.</p>
+              )}
+              {(metrics.attention || []).map((item: AttentionItem) => (
+                <Link key={item.id} to={item.href} className={`flex items-start gap-3 p-3 rounded-xl border ${
+                  item.severity === "red" ? "bg-rose-500/10 border-rose-500/20" :
+                  item.severity === "orange" ? "bg-amber-500/10 border-amber-500/20" :
+                  item.severity === "green" ? "bg-emerald-500/10 border-emerald-500/20" :
+                  "bg-zinc-900 border-zinc-800"
+                }`}>
+                  <AlertOctagon className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.detail}</p>
+                  </div>
+                </Link>
+              ))}
             </CardContent>
           </Card>
           
@@ -370,27 +419,27 @@ export default function DashboardPage() {
             <CardContent className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Kitchen Queue</span>
-                <span className="font-bold text-foreground">12</span>
+                <span className="font-bold text-foreground">{metrics.ops?.kitchenQueue ?? 0}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Orders Preparing</span>
-                <span className="font-bold text-foreground">5</span>
+                <span className="font-bold text-foreground">{metrics.ops?.preparing ?? 0}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Orders Packed</span>
-                <span className="font-bold text-foreground">3</span>
+                <span className="font-bold text-foreground">{metrics.ops?.packed ?? 0}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Out for Delivery</span>
-                <span className="font-bold text-foreground">4</span>
+                <span className="font-bold text-foreground">{metrics.ops?.outForDelivery ?? 0}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Delivered</span>
-                <span className="font-bold text-foreground">120</span>
+                <span className="font-bold text-foreground">{metrics.ops?.delivered ?? 0}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Cancelled</span>
-                <span className="font-bold text-foreground">2</span>
+                <span className="font-bold text-foreground">{metrics.ops?.cancelled ?? 0}</span>
               </div>
             </CardContent>
           </Card>

@@ -725,87 +725,99 @@ app.post("/api/auth/reset-lockout", authenticateRequest, async (req: any, res) =
 // 2. CREATE RAZORPAY ORDER ROUTE
 app.post("/api/payments/create-order", checkoutRateLimiter, validateReplayProtection, authenticateRequest, async (req: any, res) => {
   try {
-    const { planId, customizations, couponCode, deliveryFee: clientDeliveryFee } = req.body;
-    
+    const { planId, couponCode, purpose = "subscription", existingSubscriptionId } = req.body;
+    const userId = req.user?.uid;
+    const addressId = req.body.addressId || req.body.notes?.addressId || "";
+
     if (!planId) {
       return res.status(400).json({ error: "Plan ID is required" });
     }
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-    // Server-side calculation of the amount
-    let plan: any = null;
     const planSnap = await adminDb.collection("subscriptionPlans").doc(planId).get();
     if (!planSnap.exists) {
       return res.status(404).json({ error: "Subscription plan not found" });
     }
-    plan = planSnap.data();
+    const plan: any = { id: planSnap.id, ...planSnap.data() };
+    if (plan.active === false || plan.isActive === false) {
+      return res.status(400).json({ error: "This plan is not available" });
+    }
 
-    let amount = customizations?.offerPrice || plan.offerPrice || plan.price;
+    const amount = Number(plan.offerPrice ?? plan.price ?? 0);
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: "Plan price is not configured" });
+    }
+
     let discountAmount = 0;
-    
     if (couponCode) {
-      const couponSnap = await adminDb.collection("coupons").where("code", "==", couponCode.toUpperCase()).where("active", "==", true).limit(1).get();
+      const couponSnap = await adminDb.collection("coupons").where("code", "==", String(couponCode).toUpperCase()).where("active", "==", true).limit(1).get();
       if (!couponSnap.empty) {
         const coupon = couponSnap.docs[0].data();
         if (coupon.discountType === 'percentage') {
           discountAmount = Math.round((amount * coupon.discountValue) / 100);
         } else {
-          discountAmount = coupon.discountValue;
+          discountAmount = Number(coupon.discountValue || 0);
         }
       }
     }
 
-    const deliveryFee = Number(clientDeliveryFee || 0);
-    const subtotal = amount - discountAmount + deliveryFee;
+    const deliveryFee = 0;
+    const subtotal = Math.max(0, amount - discountAmount + deliveryFee);
     const taxAmount = Math.round(subtotal * 0.05);
     const totalAmount = subtotal + taxAmount;
+    const amountPaise = Math.round(totalAmount * 100);
 
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
-
     if (!keyId || !keySecret || keyId.trim() === '' || keySecret.trim() === '') {
-      console.log("Operating in Secure Sandbox Simulation (Razorpay keys missing or empty).");
-      const orderId = `order_sim_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-      return res.json({
-        id: orderId,
-        orderId: orderId,
-        success: true,
-        amount: Math.round(totalAmount * 100), // in paise
-        currency: "INR",
-        isSandbox: true,
-        keyId: "rzp_test_mock_key"
+      return res.status(503).json({
+        error: "Payments are temporarily unavailable. Please try again later.",
+        code: "PAYMENTS_UNAVAILABLE"
       });
+    }
+
+    const rzp = getRazorpayClient();
+    if (!rzp) {
+      return res.status(503).json({ error: "Payments are temporarily unavailable. Please try again later.", code: "PAYMENTS_UNAVAILABLE" });
     }
 
     let order;
     try {
-      const rzp = getRazorpayClient();
-      if (!rzp) {
-        throw new Error("Razorpay client not initialized");
-      }
       order = await rzp.orders.create({
-        amount: Math.round(totalAmount * 100), // in paise
+        amount: amountPaise,
         currency: "INR",
         receipt: `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         notes: {
-          ...req.body.notes,
+          userId,
           planId,
-          deliveryFee,
-          totalAmount
+          addressId,
+          purpose,
+          existingSubscriptionId: existingSubscriptionId || "",
+          expectedAmount: String(totalAmount)
         }
       });
     } catch (rzpErr: any) {
-      console.warn("Razorpay API order creation failed, falling back to sandbox simulation:", rzpErr?.message || rzpErr);
-      const orderId = `order_sim_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-      return res.json({
-        id: orderId,
-        orderId: orderId,
-        success: true,
-        amount: Math.round(totalAmount * 100),
-        currency: "INR",
-        isSandbox: true,
-        keyId: "rzp_test_mock_key"
-      });
+      console.error("Razorpay order creation failed:", rzpErr?.message || rzpErr);
+      return res.status(502).json({ error: "Could not start payment with Razorpay. Please retry." });
     }
+
+    await adminDb.collection("razorpayOrders").doc(order.id).set({
+      userId,
+      planId,
+      addressId,
+      purpose,
+      existingSubscriptionId: existingSubscriptionId || null,
+      couponCode: couponCode || null,
+      expectedAmount: totalAmount,
+      expectedAmountPaise: amountPaise,
+      currency: "INR",
+      discountAmount,
+      taxAmount,
+      status: "created",
+      createdAt: FieldValue.serverTimestamp()
+    });
 
     return res.json({
       id: order.id,
@@ -814,7 +826,7 @@ app.post("/api/payments/create-order", checkoutRateLimiter, validateReplayProtec
       amount: order.amount,
       currency: order.currency,
       isSandbox: false,
-      keyId: process.env.RAZORPAY_KEY_ID
+      keyId
     });
   } catch (error: any) {
     console.error("Error creating Razorpay order:", error);
@@ -825,289 +837,289 @@ app.post("/api/payments/create-order", checkoutRateLimiter, validateReplayProtec
 // 3. VERIFY RAZORPAY PAYMENT ROUTE
 app.post("/api/payments/verify", verifyLimiter, validateReplayProtection, authenticateRequest, async (req: any, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, type = 'subscription', couponCode, referralCode } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, type = 'subscription', referralCode } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: "Missing required verification fields" });
     }
 
-    const isSimulated = process.env.RAZORPAY_ALLOW_SANDBOX === 'true' && (
-                        razorpay_order_id.startsWith("order_sim_") || 
-                        razorpay_order_id.startsWith("order_sandbox_") || 
-                        razorpay_payment_id.startsWith("pay_sim_") || 
-                        razorpay_payment_id.startsWith("pay_sandbox_"));
-
-    if (!isSimulated && process.env.RAZORPAY_KEY_SECRET) {
-      const keySecret = process.env.RAZORPAY_KEY_SECRET;
-      const hmac = crypto.createHmac("sha256", keySecret);
-      hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
-      const generated_signature = hmac.digest("hex");
-
-      if (generated_signature !== razorpay_signature) {
-        return res.status(400).json({ success: false, error: "Signature verification failed" });
-      }
-    } else {
-      console.log(`Payment sandbox/simulated verification passed for order: ${razorpay_order_id}`);
+    const sandboxSig = String(razorpay_signature).startsWith("sandbox_sig");
+    if (sandboxSig || razorpay_order_id.startsWith("order_sim_") || razorpay_payment_id.startsWith("pay_sim_")) {
+      return res.status(400).json({ success: false, error: "Simulated payments are not accepted." });
     }
 
-    // Fetch order details from Razorpay or use mock if sandbox
-    let order;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keySecret) {
+      return res.status(503).json({ error: "Payments are temporarily unavailable. Please try again later." });
+    }
+    const hmac = crypto.createHmac("sha256", keySecret);
+    hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
+    if (hmac.digest("hex") !== razorpay_signature) {
+      return res.status(400).json({ success: false, error: "Signature verification failed" });
+    }
+
     const rzp = getRazorpayClient();
-    
-    if (rzp && !isSimulated) {
-      order = await rzp.orders.fetch(razorpay_order_id);
-    } else {
-      // Mock order for sandbox
-      order = {
-        id: razorpay_order_id,
-        amount: Math.round((req.body.amount || 0) * 100),
-        notes: req.body.notes || {}
-      };
-      console.log("Processing simulated order verification:", razorpay_order_id);
+    if (!rzp) {
+      return res.status(503).json({ error: "Payments are temporarily unavailable. Please try again later." });
     }
-    
-    // Idempotency check
-    let paymentDoc;
-    try {
-      const paymentDocRef = adminDb.collection('payments').doc(razorpay_payment_id);
-      paymentDoc = await paymentDocRef.get();
-      if (paymentDoc.exists) {
-        return res.json({ success: true, message: "Payment already processed", isSandbox: isSimulated });
-      }
-    } catch (dbError: any) {
-      console.warn("Database accessibility issue during idempotency check:", dbError.message);
+    const order = await rzp.orders.fetch(razorpay_order_id);
+    if (!order || String(order.currency).toUpperCase() !== "INR") {
+      return res.status(400).json({ error: "Invalid Razorpay order or currency." });
     }
 
-    const userId = order.notes?.userId || req.body.notes?.userId;
-    if (!userId) {
-      return res.status(400).json({ error: "User ID missing from order notes" });
+    const intentSnap = await adminDb.collection("razorpayOrders").doc(razorpay_order_id).get();
+    if (!intentSnap.exists) {
+      return res.status(400).json({ error: "Unknown payment order. Restart checkout." });
+    }
+    const intent = intentSnap.data() as any;
+    if (intent.status === "paid") {
+      return res.json({ success: true, message: "Payment already processed", orderNumber: intent.orderNumber || null });
+    }
+    if (intent.userId !== req.user.uid) {
+      return res.status(403).json({ error: "This payment does not belong to the signed-in customer." });
     }
 
-    if (type === 'subscription') {
-      const planId = order.notes?.planId;
-      const addressId = order.notes?.addressId;
-      
-      // Server-side plan config validation
-      let plan: any = null;
-      try {
-        const plansSnap = await adminDb.collection("subscriptionPlans").doc(planId).get();
-        if (plansSnap.exists) {
-          plan = plansSnap.data();
-        }
-      } catch (e: any) {
-        console.warn("Could not fetch plan from adminDb, will try to return fallback to client:", e.message);
-      }
+    const paymentDoc = await adminDb.collection("payments").doc(razorpay_payment_id).get();
+    if (paymentDoc.exists) {
+      return res.json({ success: true, message: "Payment already processed", orderNumber: paymentDoc.data()?.orderNumber || null });
+    }
 
-      if (!plan) {
+    const expectedPaise = Number(intent.expectedAmountPaise || Math.round(Number(intent.expectedAmount) * 100));
+    if (Math.abs(Number(order.amount) - expectedPaise) > 100) {
+      return res.status(400).json({ success: false, error: "Payment amount mismatch." });
+    }
+
+    const userId = intent.userId;
+    const planId = intent.planId;
+    const addressId = intent.addressId;
+    const purpose = intent.purpose || type || "subscription";
+    const couponCode = intent.couponCode || req.body.couponCode;
+    const discountAmount = Number(intent.discountAmount || 0);
+    const taxAmount = Number(intent.taxAmount || 0);
+
+    if (type === "subscription" || purpose === "subscription" || purpose === "renewal" || purpose === "upgrade") {
+      const plansSnap = await adminDb.collection("subscriptionPlans").doc(planId).get();
+      if (!plansSnap.exists) {
         return res.status(404).json({ error: "Subscription plan not found" });
       }
-
-      const customizations = req.body.customizations || {};
-
-      // Calculate expected amount
-      let expectedBaseAmount = customizations?.offerPrice || plan.offerPrice || plan.price;
-      let discountAmount = 0;
-      
-      try {
-        if (couponCode) {
-          const couponSnap = await adminDb.collection("coupons").where("code", "==", couponCode.toUpperCase()).where("active", "==", true).limit(1).get();
-          if (!couponSnap.empty) {
-            const coupon = couponSnap.docs[0].data();
-            if (coupon.discountType === 'percentage') {
-              discountAmount = Math.round((expectedBaseAmount * coupon.discountValue) / 100);
-            } else {
-              discountAmount = coupon.discountValue;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("Coupon validation failed on server, client will handle:", e);
-      }
-
-      const deliveryFee = Number(order.notes?.deliveryFee || 0);
-      const subtotal = expectedBaseAmount - discountAmount + deliveryFee;
-      const taxAmount = Math.round(subtotal * 0.05);
-      const expectedTotal = subtotal + taxAmount;
-
-      // STRICT SECURITY CHECK: Validate that the paid amount matches our server-calculated amount
-      // We allow a small tolerance for rounding (1 unit of currency)
-      const paidAmount = order.amount / 100;
-      if (Math.abs(paidAmount - expectedTotal) > 1 && !isSimulated) {
-        console.error(`[SECURITY ALERT] Payment amount mismatch for order ${razorpay_order_id}. Expected: ${expectedTotal}, Paid: ${paidAmount}`);
-        return res.status(400).json({ 
-          success: false, 
-          error: "Payment amount mismatch. Financial discrepancy detected." 
-        });
-      }
-
+      const plan: any = { id: plansSnap.id, ...plansSnap.data() };
       const orderNumber = "ORD-" + Date.now().toString().slice(-6) + Math.floor(1000 + Math.random() * 9000);
 
       try {
-        const userSnap = await adminDb.collection('users').doc(userId).get();
+        const userSnap = await adminDb.collection("users").doc(userId).get();
         const userData = userSnap.data();
-        const customerName = userData?.displayName || userData?.name || "Valued Customer";
-        
+        const customerName = userData?.displayName || userData?.name || "Customer";
         const batch = adminDb.batch();
-        const invoiceNumber = "INV-2026-" + Math.floor(100000 + Math.random() * 900000);
 
-        // 1. Payment Record
-        const paymentDocRef = adminDb.collection('payments').doc(razorpay_payment_id);
-        batch.set(paymentDocRef, {
+        const duration = Number(plan.durationDays ?? plan.duration ?? 30);
+        const mealsPerDay = Number(plan.mealsPerDay || 1);
+        const totalMeals = Number(plan.totalMeals || duration * mealsPerDay);
+        const planName = plan.planName || plan.name;
+        const planSnapshot = {
+          id: plan.id,
+          planName,
+          description: plan.description || "",
+          price: Number(plan.price || 0),
+          offerPrice: Number(plan.offerPrice ?? plan.price ?? 0),
+          duration,
+          durationDays: duration,
+          mealsPerDay,
+          totalMeals,
+          calories: Number(plan.calories || 0),
+          protein: Number(plan.protein || 0),
+          deliverySchedule: plan.deliverySchedule || "Daily delivery",
+          features: plan.features || [],
+          savings: Number(plan.savings || 0),
+        };
+
+        let subRef = adminDb.collection("subscriptions").doc();
+        let isRenewal = purpose === "renewal" || purpose === "upgrade";
+        if (isRenewal && intent.existingSubscriptionId) {
+          subRef = adminDb.collection("subscriptions").doc(intent.existingSubscriptionId);
+        }
+
+        const startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + duration);
+        const tomorrow = new Date(startDate);
+        tomorrow.setDate(startDate.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+        batch.set(adminDb.collection("payments").doc(razorpay_payment_id), {
           paymentId: razorpay_payment_id,
           userId,
-          subscriptionId: userId,
+          customerId: userId,
+          subscriptionId: subRef.id,
           razorpayOrderId: razorpay_order_id,
           razorpayPaymentId: razorpay_payment_id,
-          amount: order.amount / 100,
+          amount: Number(order.amount) / 100,
           currency: "INR",
           paymentMethod: req.body.paymentMethod || "Razorpay",
           status: "verified",
           verified: true,
-          createdAt: FieldValue.serverTimestamp()
+          purpose,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // 2. Activate Subscription
-        const startDate = new Date();
-        startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(startDate);
-        const duration = customizations?.durationDays || plan.durationDays || 30;
-        endDate.setDate(startDate.getDate() + duration);
-        const mealsPerDay = customizations?.mealsPerDay || plan.mealsPerDay || 1;
-        const totalMeals = customizations?.totalMeals || (duration * mealsPerDay);
-
-        const subRef = adminDb.collection('subscriptions').doc(userId);
-        batch.set(subRef, {
+        const subPayload: any = {
           userId,
+          customerId: userId,
           planId: plan.id,
-          planName: plan.name,
+          planName,
+          planSnapshot,
           status: "active",
-          startDate: FieldValue.serverTimestamp(),
+          paused: false,
+          startDate: Timestamp.fromDate(startDate),
           endDate: Timestamp.fromDate(endDate),
+          totalMeals,
+          mealsCompleted: isRenewal ? FieldValue.increment(0) : 0,
+          mealsRemaining: totalMeals,
           remainingMeals: totalMeals,
-          mealsPerDay: mealsPerDay,
+          mealsPerDay,
           durationDays: duration,
-          dietType: customizations?.dietType || plan.dietType || "Standard",
-          deliveryAddressId: addressId,
-          customizations: customizations || {},
+          paymentId: razorpay_payment_id,
+          deliveryAddressId: addressId || "",
+          nextDeliveryDate: tomorrowStr,
           activatedAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp()
+          updatedAt: FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+        };
+
+        if (isRenewal) {
+          delete subPayload.createdAt;
+          delete subPayload.mealsCompleted;
+          batch.set(subRef, { ...subPayload, mealsRemaining: totalMeals, remainingMeals: totalMeals }, { merge: true });
+        } else {
+          batch.set(subRef, subPayload);
+        }
+
+        batch.set(adminDb.collection("razorpayOrders").doc(razorpay_order_id), {
+          status: "paid",
+          paymentId: razorpay_payment_id,
+          orderNumber,
+          paidAt: FieldValue.serverTimestamp(),
         }, { merge: true });
 
-        // 3. Create First Order
-        const orderRef = adminDb.collection('orders').doc(orderNumber);
-        batch.set(orderRef, {
+        batch.set(adminDb.collection("orders").doc(orderNumber), {
           orderNumber,
           userId,
-          subscriptionId: userId,
-          amount: order.amount / 100,
+          customerId: userId,
+          subscriptionId: subRef.id,
+          planName,
+          amount: Number(order.amount) / 100,
           discount: discountAmount,
           coupon: couponCode || "",
           tax: taxAmount,
           paymentStatus: "paid",
+          paymentId: razorpay_payment_id,
           orderStatus: "confirmed",
-          createdAt: FieldValue.serverTimestamp()
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
         });
 
-        // 4. Generate Meal Schedule
-        const tomorrow = new Date(startDate);
-        tomorrow.setDate(startDate.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-        for (let i = 0; i < duration; i++) {
-          const scheduleDate = new Date(startDate);
-          scheduleDate.setDate(startDate.getDate() + i + 1);
-          const dateStr = scheduleDate.toISOString().split('T')[0];
-          
-          for (let m = 0; m < mealsPerDay; m++) {
-            const mealType = m === 0 ? "Lunch" : m === 1 ? "Dinner" : "Breakfast";
-            const scheduleId = `ms_${userId}_${dateStr}_${mealType}`;
-            const scheduleRef = adminDb.collection('mealSchedules').doc(scheduleId);
-            
-            const deliveryTime = m === 0 ? "12:00 PM - 02:00 PM" : "07:00 PM - 09:00 PM";
-            
-            batch.set(scheduleRef, {
-              id: scheduleId,
-              subscriptionId: userId,
-              userId,
-              date: dateStr,
-              mealType,
-              mealId: "pending",
-              deliveryStatus: "pending",
-              deliveryTime,
-              createdAt: FieldValue.serverTimestamp()
-            });
-
-            // 5. Generate first kitchen queue for tomorrow
-            if (dateStr === tomorrowStr) {
-              const queueId = `kq_${scheduleId}`;
-              batch.set(adminDb.collection('kitchenQueue').doc(queueId), {
-                id: queueId,
-                scheduleId,
+        if (!isRenewal) {
+          for (let i = 0; i < duration; i++) {
+            const scheduleDate = new Date(startDate);
+            scheduleDate.setDate(startDate.getDate() + i + 1);
+            const dateStr = scheduleDate.toISOString().split("T")[0];
+            for (let m = 0; m < mealsPerDay; m++) {
+              const mealType = m === 0 ? "Lunch" : m === 1 ? "Dinner" : "Breakfast";
+              const scheduleId = `ms_${subRef.id}_${dateStr}_${mealType}`;
+              const deliveryTime = m === 0 ? "12:00 PM - 02:00 PM" : "07:00 PM - 09:00 PM";
+              batch.set(adminDb.collection("mealSchedules").doc(scheduleId), {
+                id: scheduleId,
+                subscriptionId: subRef.id,
                 userId,
-                customerName,
-                subscriptionPlan: plan.name,
+                date: dateStr,
                 mealType,
-                deliverySlot: deliveryTime,
-                status: "Pending",
+                mealId: "pending",
+                deliveryStatus: "preparing",
+                deliveryTime,
                 createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp()
               });
             }
           }
+
+          const deliveryId = `del_${subRef.id}_${tomorrowStr}`;
+          batch.set(adminDb.collection("deliveries").doc(deliveryId), {
+            userId,
+            subscriptionId: subRef.id,
+            orderId: orderNumber,
+            mealType: mealsPerDay >= 2 ? "Lunch" : "Lunch",
+            deliveryDate: tomorrowStr,
+            deliveryStatus: "preparing",
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp()
+          });
         }
 
-        // 6. Notification
-        const notifRef = adminDb.collection('notifications').doc();
-        batch.set(notifRef, {
+        batch.set(adminDb.collection("notifications").doc(), {
           userId,
-          title: "Subscription Activated! 🥗",
-          message: `Your ${plan.name} protocol is now active. First delivery scheduled for tomorrow.`,
+          title: isRenewal ? "Subscription renewed" : "Subscription activated",
+          message: `Your ${planName} plan is active. Next delivery is scheduled for tomorrow.`,
           type: "subscription",
           read: false,
           createdAt: FieldValue.serverTimestamp()
         });
-        
-        // 7. Update User
-        const userRef = adminDb.collection('users').doc(userId);
-        batch.set(userRef, { hasActiveSubscription: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 
-        // 8. Process Referral if applicable
+        batch.set(adminDb.collection("subscriptionEvents").doc(), {
+          userId,
+          customerId: userId,
+          subscriptionId: subRef.id,
+          type: isRenewal ? "renewed" : "activated",
+          payload: { planId: plan.id, paymentId: razorpay_payment_id },
+          createdAt: FieldValue.serverTimestamp()
+        });
+
+        const crm = {
+          hasActiveSubscription: true,
+          currentPlanId: plan.id,
+          currentSubscriptionId: subRef.id,
+          mealsRemaining: totalMeals,
+          mealsCompleted: 0,
+          nextDeliveryDate: tomorrowStr,
+          retentionState: "healthy",
+          lastActivityAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        };
+        batch.set(adminDb.collection("users").doc(userId), crm, { merge: true });
+        batch.set(adminDb.collection("customers").doc(userId), crm, { merge: true });
+
         if (referralCode) {
-          try {
-            const referrerSnap = await adminDb.collection('users').where('referralCode', '==', referralCode.toUpperCase()).limit(1).get();
-            if (!referrerSnap.empty) {
-              const referrer = referrerSnap.docs[0].data();
-              if (referrer.uid !== userId) {
-                const refId = `ref_${referrer.uid}_${userId}`;
-                const refRef = adminDb.collection('referrals').doc(refId);
-                batch.set(refRef, {
-                  id: refId,
-                  referrerUserId: referrer.uid,
-                  referredUserId: userId,
-                  status: 'pending',
-                  rewardIssued: false,
-                  createdAt: FieldValue.serverTimestamp()
-                });
-              }
+          const referrerSnap = await adminDb.collection("users").where("referralCode", "==", String(referralCode).toUpperCase()).limit(1).get();
+          if (!referrerSnap.empty) {
+            const referrer = referrerSnap.docs[0].data();
+            if (referrer.uid && referrer.uid !== userId) {
+              const refId = `ref_${referrer.uid}_${userId}`;
+              batch.set(adminDb.collection("referrals").doc(refId), {
+                id: refId,
+                referrerUserId: referrer.uid,
+                referredUserId: userId,
+                status: "pending",
+                rewardIssued: false,
+                createdAt: FieldValue.serverTimestamp()
+              }, { merge: true });
             }
-          } catch (refErr) {
-            console.error("Error processing referral in background:", refErr);
           }
         }
 
-      await batch.commit();
-      return res.json({ 
-        success: true, 
-        orderNumber, 
-        isSandbox: isSimulated 
-      });
-    } catch (dbError: any) {
-      console.error("Firestore batch commit failed:", dbError.message);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Database update failed. Please contact support with your payment ID." 
-      });
-    }
+        await batch.commit();
+        return res.json({
+          success: true,
+          orderNumber,
+          subscriptionId: subRef.id,
+          isSandbox: false
+        });
+      } catch (dbError: any) {
+        console.error("Firestore batch commit failed:", dbError.message);
+        return res.status(500).json({
+          success: false,
+          error: "Database update failed. Please contact support with your payment ID."
+        });
+      }
 
     } else if (type === 'recharge') {
       // Wallet recharge logic

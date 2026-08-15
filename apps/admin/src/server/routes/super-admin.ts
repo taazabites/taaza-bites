@@ -125,14 +125,19 @@ router.post('/partners', authenticate, async (req: AuthenticatedRequest, res) =>
 
   const profile = {
     uid: partnerUid,
+    partnerId: partnerUid,
     phone: cleanPhone ? `+91${cleanPhone.slice(-10)}` : '',
     name: name || 'Delivery Partner',
     email: email || '',
     role: 'deliveryPartner',
     status: 'Active',
+    active: true,
     isBlocked: false,
     isApproved: true,
     vehicleType: vehicleType || 'Bike',
+    currentStatus: 'OFFLINE',
+    joiningDate: new Date().toISOString().slice(0, 10),
+    serviceAreas: [],
     approvedAt: new Date().toISOString(),
     approvedBy: req.user.uid,
     createdAt: new Date().toISOString(),
@@ -162,8 +167,18 @@ router.patch('/partners/:id', authenticate, async (req: AuthenticatedRequest, re
   const id = req.params.id;
   const { isBlocked, status, isApproved, name } = req.body || {};
   const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-  if (typeof isBlocked === 'boolean') patch.isBlocked = isBlocked;
-  if (status) patch.status = status;
+  if (typeof isBlocked === 'boolean') {
+    patch.isBlocked = isBlocked;
+    patch.active = !isBlocked;
+    patch.currentStatus = isBlocked ? 'SUSPENDED' : 'OFFLINE';
+  }
+  if (status) {
+    patch.status = status;
+    if (status === 'Inactive' || status === 'Deactivated' || status === 'SUSPENDED') {
+      patch.currentStatus = 'SUSPENDED';
+      patch.active = false;
+    }
+  }
   if (typeof isApproved === 'boolean') patch.isApproved = isApproved;
   if (name) patch.name = name;
 

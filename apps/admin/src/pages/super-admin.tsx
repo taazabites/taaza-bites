@@ -182,7 +182,7 @@ export default function SuperAdminPage() {
   ];
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-start gap-3">
         <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
           <Shield className="w-6 h-6" />

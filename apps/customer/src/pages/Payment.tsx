@@ -217,13 +217,9 @@ export default function Payment() {
  if (!user || !state) return;
 
  if (orderData.isSandbox || !(window as any).Razorpay) {
- const mockPaymentId = `pay_sim_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
- handlePaymentVerification(
- orderData.id || orderData.orderId,
- mockPaymentId,
- "sandbox_sig_approved",
- "sandbox" as any
- );
+ setErrorMessage("Payments are unavailable right now. Please retry.");
+ setPaymentStep("failed");
+ setLoading(false);
  return;
  }
 

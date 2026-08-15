@@ -103,9 +103,9 @@ export default function RenewalsPage() {
     const customer = customers.find(c => c.id === sub.customerId)
     const plan = plans.find(p => p.id === sub.planId)
     
-    const cName = customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.name : "Rahul Sharma"
-    const pName = plan ? plan.name : "Pro Meal Plan"
-    const cPhone = customer ? customer.phone : "9876543210"
+    const cName = customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.name : "Unknown customer"
+    const pName = plan ? plan.name : "Plan"
+    const cPhone = customer ? customer.phone : ""
 
     const searchStr = `${sub.id} ${cName} ${cPhone} ${pName}`.toLowerCase()
     if (searchQuery && !searchStr.includes(searchQuery.toLowerCase())) return false
@@ -156,7 +156,7 @@ export default function RenewalsPage() {
     const customer = customers.find(c => c.id === sub.customerId)
     const name = customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() : "Customer"
     
-    toast.success(`Renewal WhatsApp & SMS alert dispatched to ${name}!`)
+    toast.message(`Queued an approved renewal notice for ${name}. Nothing was sent automatically.`)
     if (user) {
       await auditService.logAction(
         user.id,

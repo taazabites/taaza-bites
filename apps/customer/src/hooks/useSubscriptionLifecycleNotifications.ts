@@ -37,14 +37,17 @@ export function useSubscriptionLifecycleNotifications() {
 
           // 1 day before expiry
           const msUntilEnd = end - now;
-          if (msUntilEnd > 0 && msUntilEnd <= dayMs + 2 * 60 * 60 * 1000 && ["active", "paused"].includes(status)) {
-            await maybeNotify(uid, `expiry_soon_${docSnap.id}`, {
-              title: "Subscription expires tomorrow",
-              message:
-                "Your Taaza Bites plan expires in about 1 day. Renew now so your meals continue without a break.",
-              type: "renewal",
-              link: "/subscriptions",
-            });
+          if (msUntilEnd > 0 && ["active", "paused", "expiring"].includes(status)) {
+            const daysLeft = Math.ceil(msUntilEnd / dayMs);
+            if ([7, 3, 1].includes(daysLeft)) {
+              await maybeNotify(uid, `expiry_${daysLeft}d_${docSnap.id}`, {
+                title: daysLeft === 1 ? "Subscription expires tomorrow" : `Subscription expires in ${daysLeft} days`,
+                message:
+                  "Renew now so your meals continue without a break.",
+                type: "renewal",
+                link: `/plans?mode=renew&subscriptionId=${docSnap.id}`,
+              });
+            }
           }
 
           // 3 days after expiry — win-back if still inactive

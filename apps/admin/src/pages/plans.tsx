@@ -377,7 +377,7 @@ export default function SubscriptionPlansPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 p-6 md:p-8 space-y-8 select-none">
+    <div className="bg-background text-zinc-100 space-y-8 select-none">
       
       {/* Top Welcome Panel */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

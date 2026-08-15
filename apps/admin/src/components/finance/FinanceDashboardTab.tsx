@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { IndianRupee, TrendingUp, AlertCircle, CheckCircle2, Wallet, RefreshCcw, ArrowUpRight, ArrowDownRight, Clock } from "lucide-react";
+import { IndianRupee, TrendingUp, Receipt, ArrowDownRight, Clock, Wallet } from "lucide-react";
 import { Payment, Refund, Expense } from "../../types";
 
 interface FinanceDashboardTabProps {
@@ -9,8 +9,67 @@ interface FinanceDashboardTabProps {
   expenses: Expense[];
 }
 
+function KpiCard({
+  title,
+  value,
+  hint,
+  icon: Icon,
+  tone,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: "emerald" | "blue" | "amber" | "violet";
+}) {
+  const tones = {
+    emerald: {
+      card: "border-emerald-500/25 bg-emerald-500/10",
+      title: "text-emerald-200",
+      icon: "bg-emerald-500/20 text-emerald-300",
+      value: "text-white",
+      hint: "text-emerald-300/90",
+    },
+    blue: {
+      card: "border-sky-500/25 bg-sky-500/10",
+      title: "text-sky-200",
+      icon: "bg-sky-500/20 text-sky-300",
+      value: "text-white",
+      hint: "text-sky-300/90",
+    },
+    amber: {
+      card: "border-amber-500/25 bg-amber-500/10",
+      title: "text-amber-200",
+      icon: "bg-amber-500/20 text-amber-300",
+      value: "text-white",
+      hint: "text-amber-300/90",
+    },
+    violet: {
+      card: "border-violet-500/25 bg-violet-500/10",
+      title: "text-violet-200",
+      icon: "bg-violet-500/20 text-violet-300",
+      value: "text-white",
+      hint: "text-violet-300/90",
+    },
+  }[tone];
+
+  return (
+    <Card className={tones.card}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+        <CardTitle className={`text-sm font-medium ${tones.title}`}>{title}</CardTitle>
+        <div className={`p-2 rounded-lg ${tones.icon}`}>
+          <Icon className="w-4 h-4" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold tracking-tight ${tones.value}`}>{value}</div>
+        <p className={`text-xs mt-1.5 ${tones.hint}`}>{hint}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FinanceDashboardTab({ payments, refunds, expenses }: FinanceDashboardTabProps) {
-  // Calculations
   const totalRevenue = payments
     .filter(p => p.status === 'Success')
     .reduce((acc, p) => acc + (p.netAmount || p.amount || 0), 0);
@@ -36,94 +95,66 @@ export function FinanceDashboardTab({ payments, refunds, expenses }: FinanceDash
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-emerald-100 bg-emerald-50/30">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-900">Today's Revenue</CardTitle>
-            <div className="p-2 bg-emerald-100 rounded-lg text-emerald-700">
-              <IndianRupee className="w-4 h-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-950">₹{todaysRevenue.toLocaleString('en-IN')}</div>
-            <p className="text-xs text-emerald-700 mt-1 flex items-center gap-1">
-              <ArrowUpRight className="w-3 h-3" /> Real-time collection
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-100 bg-blue-50/30">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-blue-900">Total Net Revenue</CardTitle>
-            <div className="p-2 bg-blue-100 rounded-lg text-blue-700">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-950">₹{totalRevenue.toLocaleString('en-IN')}</div>
-            <p className="text-xs text-blue-700 mt-1 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Successfully reconciled
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-100 bg-amber-50/30">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-amber-900">Pending & Failed</CardTitle>
-            <div className="p-2 bg-amber-100 rounded-lg text-amber-700">
-              <Clock className="w-4 h-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-950">₹{pendingPaymentsAmount.toLocaleString('en-IN')}</div>
-            <p className="text-xs text-amber-700 mt-1">
-              {failedPaymentsCount} failed payment attempts
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-100 bg-purple-50/30">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-purple-900">Operating Expenses</CardTitle>
-            <div className="p-2 bg-purple-100 rounded-lg text-purple-700">
-              <ArrowDownRight className="w-4 h-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-950">₹{totalExpenses.toLocaleString('en-IN')}</div>
-            <p className="text-xs text-purple-700 mt-1">
-              Net Profit: ₹{netProfit.toLocaleString('en-IN')}
-            </p>
-          </CardContent>
-        </Card>
+        <KpiCard
+          title="Today's Revenue"
+          value={`₹${todaysRevenue.toLocaleString('en-IN')}`}
+          hint="Real-time collection"
+          icon={IndianRupee}
+          tone="emerald"
+        />
+        <KpiCard
+          title="Total Net Revenue"
+          value={`₹${totalRevenue.toLocaleString('en-IN')}`}
+          hint="Successfully reconciled"
+          icon={TrendingUp}
+          tone="blue"
+        />
+        <KpiCard
+          title="Pending & Failed"
+          value={`₹${pendingPaymentsAmount.toLocaleString('en-IN')}`}
+          hint={`${failedPaymentsCount} failed payment attempts`}
+          icon={Clock}
+          tone="amber"
+        />
+        <KpiCard
+          title="Operating Expenses"
+          value={`₹${totalExpenses.toLocaleString('en-IN')}`}
+          hint={`Net profit: ₹${netProfit.toLocaleString('en-IN')}`}
+          icon={ArrowDownRight}
+          tone="violet"
+        />
       </div>
 
-      {/* Breakdown and Recent Financial Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-lg">Recent Financial Transactions</CardTitle>
+            <CardTitle className="text-lg text-foreground">Recent Financial Transactions</CardTitle>
             <CardDescription>Latest customer subscription payments and payouts</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {payments.slice(0, 5).map((p) => (
-                <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs">
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/40 hover:bg-muted/70 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs shrink-0">
                       ₹
                     </div>
-                    <div>
-                      <p className="font-medium text-sm text-slate-900">{p.customerName || 'Customer'}</p>
-                      <p className="text-xs text-slate-500">{p.paymentMethod} • {new Date(p.createdAt || Date.now()).toLocaleDateString()}</p>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-foreground truncate">{p.customerName || 'Customer'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.paymentMethod} • {new Date(p.createdAt || Date.now()).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-sm text-slate-900">+₹{p.amount?.toLocaleString('en-IN')}</p>
+                  <div className="text-right shrink-0 ml-3">
+                    <p className="font-semibold text-sm text-foreground">+₹{p.amount?.toLocaleString('en-IN')}</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      p.status === 'Success' ? 'bg-emerald-100 text-emerald-700' :
-                      p.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                      p.status === 'Success' ? 'bg-emerald-500/20 text-emerald-300' :
+                      p.status === 'Pending' ? 'bg-amber-500/20 text-amber-300' : 'bg-rose-500/20 text-rose-300'
                     }`}>
                       {p.status}
                     </span>
@@ -131,33 +162,44 @@ export function FinanceDashboardTab({ payments, refunds, expenses }: FinanceDash
                 </div>
               ))}
               {payments.length === 0 && (
-                <p className="text-sm text-slate-500 text-center py-6">No recent transactions recorded.</p>
+                <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
+                  <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                    <Receipt className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">No recent transactions</p>
+                  <p className="text-xs text-muted-foreground max-w-xs">
+                    Successful Razorpay checkouts will appear here. Collect a payment or wait for a customer order.
+                  </p>
+                </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-lg">Financial Summary</CardTitle>
-            <CardDescription>Quick Ledger Overview</CardDescription>
+            <CardTitle className="text-lg text-foreground flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-emerald-400" />
+              Financial Summary
+            </CardTitle>
+            <CardDescription>Quick ledger overview</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-              <span className="text-sm text-slate-600">Total Inflows</span>
-              <span className="font-semibold text-emerald-600">₹{totalRevenue.toLocaleString('en-IN')}</span>
+          <CardContent className="space-y-1">
+            <div className="flex justify-between items-center py-2.5 border-b border-border">
+              <span className="text-sm text-muted-foreground">Total Inflows</span>
+              <span className="font-semibold text-emerald-400">₹{totalRevenue.toLocaleString('en-IN')}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-              <span className="text-sm text-slate-600">Total Outflows (Expenses)</span>
-              <span className="font-semibold text-red-600">₹{totalExpenses.toLocaleString('en-IN')}</span>
+            <div className="flex justify-between items-center py-2.5 border-b border-border">
+              <span className="text-sm text-muted-foreground">Total Outflows (Expenses)</span>
+              <span className="font-semibold text-rose-400">₹{totalExpenses.toLocaleString('en-IN')}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-              <span className="text-sm text-slate-600">Refunds Processed</span>
-              <span className="font-semibold text-amber-600">₹{totalRefundsAmount.toLocaleString('en-IN')}</span>
+            <div className="flex justify-between items-center py-2.5 border-b border-border">
+              <span className="text-sm text-muted-foreground">Refunds Processed</span>
+              <span className="font-semibold text-amber-400">₹{totalRefundsAmount.toLocaleString('en-IN')}</span>
             </div>
-            <div className="flex justify-between items-center py-2 pt-2">
-              <span className="text-base font-bold text-slate-900">Net Operating Balance</span>
-              <span className={`font-bold text-base ${netProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+            <div className="flex justify-between items-center py-3">
+              <span className="text-sm font-semibold text-foreground">Net Operating Balance</span>
+              <span className={`font-bold ${netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 ₹{netProfit.toLocaleString('en-IN')}
               </span>
             </div>

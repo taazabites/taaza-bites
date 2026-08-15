@@ -525,6 +525,9 @@ export default function CustomersPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-[180px] bg-zinc-950 border-zinc-800 text-zinc-300 shadow-xl">
                                 <DropdownMenuLabel className="text-zinc-500 text-xs uppercase tracking-wider">Actions</DropdownMenuLabel>
+                                <DropdownMenuItem className="focus:bg-zinc-900 focus:text-white cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/crm/customers/${customer.id}`); }}>
+                                  View 360
+                                </DropdownMenuItem>
                                 <DropdownMenuItem className="focus:bg-zinc-900 focus:text-white cursor-pointer" onClick={(e) => { e.stopPropagation(); handleEditOpen(customer); }}>
                                   <Edit2 className="mr-2 h-4 w-4" /> Edit Customer
                                 </DropdownMenuItem>

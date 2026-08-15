@@ -1,6 +1,7 @@
-import { 
+﻿import { 
   collection, 
   getDocs, 
+  getDoc,
   query, 
   orderBy, 
   limit, 
@@ -16,6 +17,7 @@ import {
 import { db } from '../lib/firebase';
 import { Order } from '../types';
 import { auditService } from './audit';
+import { canTransitionOrder, orderTransitionError, normalizeOrderStatus } from '../lib/order-status';
 
 // Toggle for UI Stabilization phase
 
@@ -153,10 +155,16 @@ export const orderService = {
     try {
       const orderRef = doc(db, 'orders', orderId);
       const nowString = new Date().toISOString();
-      
-      const updateData = { 
-        orderStatus: status,
-        status: status, // maintain legacy field
+      const existing = await getDoc(orderRef);
+      const current = existing.data()?.orderStatus || existing.data()?.status;
+      const next = normalizeOrderStatus(status);
+      if (!canTransitionOrder(current, next)) {
+        throw new Error(orderTransitionError(current, next) || 'Invalid status transition');
+      }
+
+      const updateData = {
+        orderStatus: next,
+        status: next,
         updatedAt: nowString
       };
 
@@ -356,11 +364,11 @@ export const orderService = {
       'Out For Delivery': {
         whatsapp: `Hey ${customerName}, your ${mealName} is out for delivery with our delivery partner ${driverName}. Get ready for some fresh goodness!`,
         push: `On the way: Your Taaza Bites meal is out for delivery with ${driverName}!`,
-        email: `Subject: Your Meal is Out for Delivery! 🚚\n\nHi ${customerName},\n\nYour fresh meal: ${mealName} is out for delivery with partner ${driverName}.\n\nEnjoy your meal!`
+        email: `Subject: Your Meal is Out for Delivery! ðŸšš\n\nHi ${customerName},\n\nYour fresh meal: ${mealName} is out for delivery with partner ${driverName}.\n\nEnjoy your meal!`
       },
       Delivered: {
         whatsapp: `Hey ${customerName}, your fresh ${mealName} has been delivered. Enjoy your healthy meal! Don't forget to rate your experience.`,
-        push: `Delivered: Bon appétit! Your fresh meal has arrived.`,
+        push: `Delivered: Bon appÃ©tit! Your fresh meal has arrived.`,
         email: `Subject: Delivered: Enjoy your fresh Taaza Bites meal!\n\nHi ${customerName},\n\nYour meal: ${mealName} has been successfully delivered.\n\nThank you for choosing Taaza Bites!`
       },
       Cancelled: {
@@ -425,191 +433,7 @@ export const orderService = {
    * Seeds realistic sample orders into Firestore
    */
   async seedSampleOrders(): Promise<void> {
-    try {
-      // Ensure delivery partners exist first
-      await this.seedDeliveryPartners();
-
-      const sampleData = [
-        {
-          orderId: 'TZ-1001',
-          customerId: 'cust-101',
-          customerName: 'Rahul Sharma',
-          customerPhone: '+91 98765 43210',
-          subscriptionId: 'sub-201',
-          subscriptionPlan: 'Weight Loss Plan',
-          mealId: 'meal-01',
-          mealName: 'Grilled Paneer Salad',
-          mealType: 'Veg',
-          quantity: 1,
-          deliveryDate: new Date().toISOString(),
-          deliverySlot: 'Lunch (12:00 PM - 2:00 PM)',
-          deliveryAddress: 'Flat 102, Green Heights, Hiranandani Garden',
-          pincode: '400076',
-          assignedDriverId: 'driver-powai',
-          assignedDriverName: 'Suresh Kumar',
-          paymentStatus: 'Paid',
-          orderStatus: 'Pending',
-          kitchenStatus: 'Pending',
-          deliveryStatus: 'Pending',
-          orderTotal: 250,
-          notes: 'No onions please, extra dressing on the side.',
-          createdAt: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 4 * 3600 * 1000).toISOString()
-        },
-        {
-          orderId: 'TZ-1002',
-          customerId: 'cust-102',
-          customerName: 'Priya Patel',
-          customerPhone: '+91 98234 56789',
-          subscriptionId: 'sub-202',
-          planName: 'Keto Gourmet',
-          mealId: 'meal-02',
-          mealName: 'Tandoori Tofu Quinoa Bowl',
-          deliveryAddress: 'Villa 12, Palms Estate, Carter Road',
-          deliveryArea: 'Bandra West',
-          deliverySlot: 'Dinner (7:00 PM - 9:00 PM)',
-          driverId: 'driver-bandra',
-          driverName: 'Amit Patel',
-          paymentStatus: 'Paid',
-          orderStatus: 'Confirmed',
-          specialInstructions: 'Leave with the security guard at gates.',
-          createdAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(), // 3 hours ago
-          updatedAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString()
-        },
-        {
-          orderId: 'TZ-1003',
-          customerId: 'cust-103',
-          customerName: 'Arjun Mehta',
-          customerPhone: '+91 98345 67890',
-          subscriptionId: 'sub-203',
-          planName: 'High Protein Active',
-          mealId: 'meal-03',
-          mealName: 'Butter Chicken Brown Rice Bowl',
-          deliveryAddress: 'Apt 402, Sea Breeze, Juhu Scheme',
-          deliveryArea: 'Juhu',
-          deliverySlot: 'Lunch (12:00 PM - 2:00 PM)',
-          driverId: 'driver-juhu',
-          driverName: 'Karan Malhotra',
-          paymentStatus: 'Paid',
-          orderStatus: 'Preparing',
-          specialInstructions: 'Deliver hot, ring doorbell twice.',
-          createdAt: new Date(Date.now() - 2.5 * 3600 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString()
-        },
-        {
-          orderId: 'TZ-1004',
-          customerId: 'cust-104',
-          customerName: 'Anjali Desai',
-          customerPhone: '+91 98456 78901',
-          subscriptionId: 'sub-204',
-          planName: 'Balanced Nutrition',
-          mealId: 'meal-04',
-          mealName: 'Mediterranean Chickpea Wrap',
-          deliveryAddress: 'Office 7A, 4th Floor, Tech Park, Saki Naka',
-          deliveryArea: 'Andheri West',
-          deliverySlot: 'Lunch (12:00 PM - 2:00 PM)',
-          driverId: 'driver-andheri',
-          driverName: 'Ramesh Singh',
-          paymentStatus: 'Paid',
-          orderStatus: 'Packed',
-          specialInstructions: 'Call upon arrival, do not leave with reception.',
-          createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 1 * 3600 * 1000).toISOString()
-        },
-        {
-          orderId: 'TZ-1005',
-          customerId: 'cust-105',
-          customerName: 'Vikram Sen',
-          customerPhone: '+91 98567 89012',
-          subscriptionId: 'sub-205',
-          planName: 'Keto Gourmet',
-          mealId: 'meal-05',
-          mealName: 'Garlic Butter Salmon with Asparagus',
-          deliveryAddress: 'B-2401, Sapphire Towers, Lokhandwala',
-          deliveryArea: 'Andheri West',
-          deliverySlot: 'Dinner (7:00 PM - 9:00 PM)',
-          driverId: '',
-          driverName: '',
-          paymentStatus: 'Pending',
-          orderStatus: 'Pending',
-          specialInstructions: 'Please make sure it is completely dairy-free.',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        {
-          orderId: 'TZ-1006',
-          customerId: 'cust-106',
-          customerName: 'Neha Reddy',
-          customerPhone: '+91 98678 90123',
-          subscriptionId: 'sub-206',
-          planName: 'Weight Loss Plan',
-          mealId: 'meal-01',
-          mealName: 'Grilled Paneer Salad',
-          deliveryAddress: 'Row House 4, Orchid Gardens, Powai',
-          deliveryArea: 'Powai',
-          deliverySlot: 'Breakfast (8:00 AM - 10:00 AM)',
-          driverId: 'driver-powai',
-          driverName: 'Suresh Kumar',
-          paymentStatus: 'Paid',
-          orderStatus: 'Delivered',
-          specialInstructions: 'Leave on shoe rack outside.',
-          createdAt: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 4 * 3600 * 1000).toISOString()
-        },
-        {
-          orderId: 'TZ-1007',
-          customerId: 'cust-107',
-          customerName: 'Siddharth Roy',
-          customerPhone: '+91 98789 01234',
-          subscriptionId: 'sub-207',
-          planName: 'Vegan Green Plan',
-          mealId: 'meal-06',
-          mealName: 'High Protein Lentil Dal with Quinoa',
-          deliveryAddress: 'Flat 503, Horizon View, Bandstand',
-          deliveryArea: 'Bandra West',
-          deliverySlot: 'Dinner (7:00 PM - 9:00 PM)',
-          driverId: '',
-          driverName: '',
-          paymentStatus: 'Failed',
-          orderStatus: 'Cancelled',
-          specialInstructions: 'Transaction failed, customer cancelled.',
-          createdAt: new Date(Date.now() - 10 * 3600 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 10 * 3600 * 1000).toISOString()
-        },
-        {
-          orderId: 'TZ-1008',
-          customerId: 'cust-108',
-          customerName: 'Meera Nair',
-          customerPhone: '+91 98890 12345',
-          subscriptionId: 'sub-208',
-          planName: 'High Protein Active',
-          mealId: 'meal-07',
-          mealName: 'Roasted Chicken Breast with Sweet Potato',
-          deliveryAddress: '302, Sagar Chhaya, Versova Beach Road',
-          deliveryArea: 'Juhu',
-          deliverySlot: 'Dinner (7:00 PM - 9:00 PM)',
-          driverId: 'driver-juhu',
-          driverName: 'Karan Malhotra',
-          paymentStatus: 'Paid',
-          orderStatus: 'Out For Delivery',
-          specialInstructions: 'Call the customer 5 mins before reaching.',
-          createdAt: new Date(Date.now() - 1.5 * 3600 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString()
-        }
-      ];
-
-      const batch = writeBatch(db);
-      for (const order of sampleData) {
-        // Use custom orderId as docId to ensure easy identification, or auto-generate
-        const docRef = doc(collection(db, 'orders'));
-        batch.set(docRef, { ...order, id: docRef.id });
-      }
-
-      await batch.commit();
-      console.log("Successfully seeded sample orders!");
-    } catch (err) {
-      console.error("Seeding sample orders failed: ", err);
-    }
+    throw new Error("Sample/mock order seeding is disabled. Use live subscription orders.");
   },
 
   async generateDailyOrders(userId: string): Promise<{created: number}> {

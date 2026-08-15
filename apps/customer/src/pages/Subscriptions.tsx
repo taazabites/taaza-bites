@@ -29,7 +29,9 @@ import {
   Salad,
   Leaf,
   Moon,
-  Check
+  Check,
+  FileText,
+  Download
 } from "lucide-react";
 import { Card, Button } from "@/src/components/ui/primitives";
 import { format, addDays, parseISO } from "date-fns";
@@ -37,6 +39,9 @@ import DashboardLayout from "../components/dashboard/DashboardLayout";
 import PauseSubscriptionModal from "../components/subscription/PauseSubscriptionModal";
 import { CurrentPlanSnapshotCard } from "../components/dashboard/CurrentPlanSnapshotCard";
 import { WeeklyMenuPreview } from "../components/subscription/WeeklyMenuPreview";
+import { StatusBadge } from "../components/ui/StatusBadge";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { SubscriptionActions } from "../firebase/subscription-actions";
 import { useToast } from "@/src/context/ToastContext";
 import { cn } from "@/src/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -84,6 +89,7 @@ export default function SubscriptionsPage() {
   const [showWeeklyMenu, setShowWeeklyMenu] = useState(false);
   const [isSkippedToday, setIsSkippedToday] = useState(false);
   const [isSkippingToday, setIsSkippingToday] = useState(false);
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
   // Forms
   const [vacationData, setVacationData] = useState(() => {
@@ -290,7 +296,7 @@ export default function SubscriptionsPage() {
     setIsProcessing(true);
     triggerHaptic('light');
     try {
-      await SubscriptionService.updateDeliveryDetails(subscription.id, { deliveryTime });
+      await SubscriptionActions.changeDeliveryTime(currentUser!.uid, subscription.id, deliveryTime);
       showToast("Preferred delivery window updated successfully.", "success");
       setShowTimeModal(false);
     } catch (err) {
@@ -337,21 +343,14 @@ export default function SubscriptionsPage() {
 
   // Skip Today's Meal
   const handleSkipToday = async () => {
-    if (!subscription) return;
+    if (!subscription?.id || !currentUser?.uid) return;
     setIsSkippingToday(true);
     triggerHaptic('medium');
     try {
       const todayStr = format(new Date(), 'yyyy-MM-dd');
-      await SubscriptionChangeService.requestPause(
-        currentUser!.uid,
-        subscription.id,
-        todayStr,
-        todayStr,
-        1,
-        'Skipped today meal'
-      );
+      await SubscriptionActions.skipDay(currentUser.uid, subscription.id, todayStr);
       setIsSkippedToday(true);
-      showToast("Today's delivery skipped! Your meal credit has been saved for future use.", "success");
+      showToast("Today's delivery skipped. Meal credits remain on your plan.", "success");
     } catch (err) {
       showToast("Failed to skip today's delivery. Please try again.", "error");
     } finally {
@@ -365,7 +364,7 @@ export default function SubscriptionsPage() {
     setIsProcessing(true);
     triggerHaptic('heavy');
     try {
-      await SubscriptionService.cancelSubscription(subscription.id, cancelReason);
+      await SubscriptionActions.cancel(currentUser!.uid, subscription.id, cancelReason);
       showToast("Subscription cancelled. We will miss feeding your health journey!", "success");
       setShowCancelModal(false);
       setCancelStep('offer');
@@ -382,7 +381,8 @@ export default function SubscriptionsPage() {
     setIsProcessing(true);
     triggerHaptic('light');
     try {
-      await SubscriptionService.updateDeliveryDetails(subscription.id, { deliveryAddressId: addressId });
+      const addr = addresses.find((a) => a.id === addressId);
+      await SubscriptionActions.changeAddress(currentUser!.uid, subscription.id, addressId, addr as any);
       showToast("Delivery node address updated for future packages.", "success");
       setShowAddressModal(false);
     } catch (err) {
@@ -451,8 +451,8 @@ export default function SubscriptionsPage() {
   const deliveryAreaLabel = activeAddress ? `${activeAddress.area}, ${activeAddress.city}` : "Not Selected";
 
   // Macronutrient calculation estimates if not hard-coded (Requirement 3)
-  const calories = activePlan?.calories || 1850;
-  const protein = activePlan?.protein || 120;
+  const calories = activePlan?.calories;
+  const protein = activePlan?.protein;
   const carbs = Math.round(calories * 0.45 / 4); // Standard healthy 45% Carb balance
   const fat = Math.round(calories * 0.25 / 9);  // Standard healthy 25% Fat balance
 
@@ -478,16 +478,10 @@ export default function SubscriptionsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
             {subscription && (
               <>
-                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                  subscription.status === 'active' 
-                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" 
-                    : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
-                }`}>
-                  ● Status: {subscription.status.toUpperCase()}
-                </span>
-                {subscription.deliveredMeals > 0 && (
+                <StatusBadge status={subscription.status} endDate={subscription.endDate} />
+                {Number((subscription as any).deliveredMeals || subscription.mealsCompleted || 0) > 0 && (
                   <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border bg-orange-500/10 border-orange-500/20 text-orange-600 dark:text-orange-400 flex items-center justify-center gap-1.5">
-                    <Flame className="w-3.5 h-3.5" /> Day {subscription.deliveredMeals} Streak
+                    <Flame className="w-3.5 h-3.5" /> Day {Number((subscription as any).deliveredMeals || subscription.mealsCompleted)} Streak
                   </span>
                 )}
               </>
@@ -593,12 +587,12 @@ export default function SubscriptionsPage() {
                   <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
                     {isSkippedToday ? (
                       <span className="px-5 py-3 rounded-2xl bg-amber-500/20 text-amber-700 dark:text-amber-300 font-black text-xs uppercase tracking-wider border border-amber-500/30">
-                        ✓ Credit Saved in Wallet
+                        ✓ Meal credit kept on plan
                       </span>
                     ) : (
                       <Button
                         variant="outline"
-                        onClick={handleSkipToday}
+                        onClick={() => setShowSkipConfirm(true)}
                         disabled={isSkippingToday || subscription.status === 'paused'}
                         className="w-full md:w-auto rounded-2xl border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-black text-xs uppercase tracking-wider py-4 h-auto"
                       >
@@ -622,12 +616,12 @@ export default function SubscriptionsPage() {
             <CurrentPlanSnapshotCard
               subscription={{
                 ...subscription,
-                status: subscription?.status || 'active',
-                daysRemaining: subscription?.daysRemaining ?? 24,
-                totalMeals: (subscription as any)?.totalMeals ?? 30,
-                mealCredits: (subscription as any)?.mealCredits ?? 18,
-                deliveryTime: subscription?.deliveryTime || subscription?.deliveryTiming || "Lunch (12:00 PM - 1:30 PM)",
-                planName: subscription?.planName || "Executive High-Protein Plan"
+                status: subscription?.status,
+                daysRemaining: subscription?.daysRemaining,
+                totalMeals: subscription?.totalMeals || subscription?.planSnapshot?.totalMeals,
+                mealCredits: subscription?.mealsRemaining ?? subscription?.remainingMeals,
+                deliveryTime: subscription?.deliveryTime || subscription?.deliveryTiming,
+                planName: subscription?.planSnapshot?.planName || subscription?.planName
               } as any}
               onManagePreferences={() => {
                 const element = document.getElementById('plan-preferences-section');
@@ -689,7 +683,7 @@ export default function SubscriptionsPage() {
                     <div className="text-left sm:text-right space-y-1.5 shrink-0 w-full sm:w-auto">
                       <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Plan Price</p>
                       <div className="text-3xl font-black tracking-tight text-emerald-600 dark:text-emerald-400">
-                        ₹{(activePlan?.offerPrice || activePlan?.price || 2999).toLocaleString()}
+                        ₹{(activePlan?.offerPrice || activePlan?.price)?.toLocaleString() || '—'}
                       </div>
                       <p className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Paid &bull; {subscription.mealsPerDay || 1} Meal(s) Daily</p>
                     </div>
@@ -843,10 +837,10 @@ export default function SubscriptionsPage() {
                     {daysRemaining <= 3 ? (
                       <>
                         <Button 
-                          onClick={() => { triggerHaptic('medium'); navigate("/plans"); }}
+                          onClick={() => { triggerHaptic('medium'); navigate(`/plans?mode=renew&subscriptionId=${subscription.id}`); }}
                           className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-5 h-auto font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20"
                         >
-                          Renew Plan Now (₹{(activePlan?.offerPrice || activePlan?.price || 2999).toLocaleString()})
+                          Renew Subscription
                         </Button>
                         <Button 
                           variant="outline"
@@ -881,7 +875,7 @@ export default function SubscriptionsPage() {
                         </Button>
                         <Button 
                           variant="outline"
-                          onClick={() => { triggerHaptic('medium'); navigate("/plans"); }}
+                          onClick={() => { triggerHaptic('medium'); navigate(`/plans?mode=upgrade&subscriptionId=${subscription.id}`); }}
                           className="flex-1 border-zinc-200/80 hover:bg-zinc-50 text-zinc-900 dark:border-white/10 dark:text-white dark:hover:bg-white/5 rounded-2xl py-5 h-auto font-black text-xs uppercase tracking-widest"
                         >
                           Renew / Upgrade
@@ -973,7 +967,7 @@ export default function SubscriptionsPage() {
                 <h4 className="text-lg font-black tracking-tight">Auto-Renew Subscription</h4>
                 <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 mt-2 mb-4 leading-relaxed">
                   {subscription.status === 'active' ? (
-                    <>Auto-renews on <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">{formatDateSafe(subscription.endDate)}</span> for <span className="font-extrabold">₹{(activePlan?.offerPrice || activePlan?.price || 2999).toLocaleString()}</span>.</>
+                    <>Auto-renews on <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">{formatDateSafe(subscription.endDate)}</span> for <span className="font-extrabold">₹{(activePlan?.offerPrice || activePlan?.price)?.toLocaleString() || '—'}</span>.</>
                   ) : (
                     <>Auto renewal paused until your subscription is resumed.</>
                   )}
@@ -1036,7 +1030,7 @@ export default function SubscriptionsPage() {
                       exit={{ opacity: 0, height: 0 }}
                       className="mt-6 pt-6 border-t border-zinc-100 dark:border-white/5"
                     >
-                      <WeeklyMenuPreview />
+                      <WeeklyMenuPreview goal={subscription.planName || 'Healthy Lifestyle'} dietPreference="Vegetarian" />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1067,7 +1061,7 @@ export default function SubscriptionsPage() {
                             </span>
                           </div>
                           <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                            {formatDateSafe(order.createdAt)} &bull; ₹{order.amount} &bull; {order.paymentMethod || "Online Payment"}
+                            {formatDateSafe(order.createdAt)} • ₹{order.amount} • {(order as any).paymentMethod || "Online Payment"}
                           </p>
                           <div className="text-[10px] font-bold text-zinc-500 flex items-center gap-1 mt-1">
                             <FileText className="w-3 h-3 shrink-0" /> Order #{order.id.substring(0, 8).toUpperCase()}
@@ -1159,6 +1153,28 @@ export default function SubscriptionsPage() {
                   >
                     <span>{slot}</span>
                     {deliveryTime === slot && <Check className="h-4.5 w-4.5 text-emerald-500" />}
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-zinc-500 text-xs font-bold mb-4 mt-6">Meal preference</p>
+              <div className="grid grid-cols-2 gap-2">
+                {['Breakfast', 'Lunch', 'Dinner', 'All Meals'].map((pref) => (
+                  <button
+                    key={pref}
+                    type="button"
+                    onClick={async () => {
+                      if (!currentUser?.uid || !subscription?.id) return;
+                      try {
+                        await SubscriptionActions.changeMealPreference(currentUser.uid, subscription.id, [pref]);
+                        showToast('Meal preference updated', 'success');
+                      } catch {
+                        showToast('Could not update meal preference. Retry.', 'error');
+                      }
+                    }}
+                    className="rounded-2xl border border-zinc-200 dark:border-white/10 py-3 text-xs font-black uppercase tracking-widest"
+                  >
+                    {pref}
                   </button>
                 ))}
               </div>
@@ -1549,7 +1565,7 @@ export default function SubscriptionsPage() {
               onClick={() => { triggerHaptic('medium'); navigate("/plans"); }}
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-4 h-auto font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20"
             >
-              Renew Plan Now (₹{(activePlan?.offerPrice || activePlan?.price || 2999).toLocaleString()})
+              Renew Plan Now (₹{(activePlan?.offerPrice || activePlan?.price)?.toLocaleString() || '—'})
             </Button>
           ) : subscription.status === 'active' ? (
             <div className="flex gap-3">
@@ -1587,6 +1603,19 @@ export default function SubscriptionsPage() {
         onPause={handlePauseWithDates}
         isProcessing={isProcessing}
         isDark={isDark}
+      />
+
+      <ConfirmDialog
+        open={showSkipConfirm}
+        title="Skip today?"
+        description="Today’s scheduled meals will be skipped in Firestore and those credits stay on your subscription."
+        confirmLabel="Skip today"
+        loading={isSkippingToday}
+        onConfirm={async () => {
+          await handleSkipToday();
+          setShowSkipConfirm(false);
+        }}
+        onClose={() => setShowSkipConfirm(false)}
       />
 
     </DashboardLayout>

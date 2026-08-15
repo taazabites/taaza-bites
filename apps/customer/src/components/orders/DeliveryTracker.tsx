@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Package, Truck, CheckCircle2, UtensilsCrossed } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { deliveryStepIndex, DELIVERY_STEPS, normalizeDeliveryStatus } from '@/src/lib/delivery-status';
 
 interface DeliveryTrackerProps {
   status: 'preparing' | 'shipped' | 'delivered' | 'confirmed' | 'completed' | string;
@@ -12,32 +13,17 @@ export const DeliveryTracker: React.FC<DeliveryTrackerProps> = ({ status, compac
   // Map internal statuses to tracker steps
   // Steps: Preparing (Confirmed) -> Out for Delivery (Shipped) -> Delivered (Completed)
   
-  const getActiveStep = () => {
-    switch (status) {
-      case 'delivered':
-      case 'completed':
-        return 2;
-      case 'shipped':
-      case 'out_for_delivery':
-        return 1;
-      case 'preparing':
-      case 'confirmed':
-      case 'processing':
-        return 0;
-      default:
-        return -1;
-    }
-  };
+  const getActiveStep = () => deliveryStepIndex(status);
 
   const activeStep = getActiveStep();
 
-  const steps = [
-    { label: 'Preparing', icon: UtensilsCrossed, desc: 'Chef is crafting your meal' },
-    { label: 'Out for Delivery', icon: Truck, desc: 'On its way to you' },
-    { label: 'Delivered', icon: CheckCircle2, desc: 'Enjoy your fresh meal!' }
-  ];
+  const steps = DELIVERY_STEPS.map((s) => ({
+    label: s.label,
+    icon: s.id === 'preparing' ? UtensilsCrossed : s.id === 'packed' ? Package : s.id === 'out_for_delivery' ? Truck : CheckCircle2,
+    desc: s.label
+  }));
 
-  if (activeStep === -1 && status !== 'cancelled' && status !== 'failed') {
+        if (status === 'cancelled' || status === 'failed') {
       return (
           <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center gap-3">
               <Package className="w-5 h-5 text-zinc-400" />

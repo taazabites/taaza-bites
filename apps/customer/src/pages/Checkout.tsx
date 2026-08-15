@@ -302,38 +302,9 @@ export default function CheckoutPage() {
 
       // Handle Sandbox Simulation fallback
       if (orderData.isSandbox) {
-        showToast("Processing simulated sandbox transaction...", "info");
-        const mockPaymentId = `pay_sim_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-        const verifyRes = await RazorpayService.verifyPayment({
-          razorpay_order_id: orderData.id,
-          razorpay_payment_id: mockPaymentId,
-          razorpay_signature: "sandbox_sig_approved",
-          couponCode: appliedCoupon?.code,
-          amount: total,
-          useWallet,
-          usePoints,
-          notes: {
-            userId: currentUser.uid,
-            planId: selectedPlan.id,
-            addressId: selectedAddressId,
-            deliveryFee
-          },
-          customizations: selectedPlan
-        });
-
-        if (verifyRes.success) {
-          showToast("Sandbox Payment Successful!", "success");
-          markTiffinDepositPaid();
-          navigate("/payment-success", { 
-            state: { 
-              orderNumber: verifyRes.orderNumber || "ORD-" + mockPaymentId.slice(-6),
-              planName: selectedPlan.name,
-              amount: total
-            } 
-          });
-        } else {
-          throw new Error(verifyRes.error || "Sandbox verification failed");
-        }
+        setIsProcessing(false);
+        showToast("Payments are not available right now. Please retry.", "error");
+        navigate("/payment-failed", { state: { error: "Payment gateway is not configured.", fromState: location.state } });
         return;
       }
 
@@ -372,7 +343,7 @@ export default function CheckoutPage() {
               markTiffinDepositPaid();
               navigate("/payment-success", { 
                  state: { 
-                   orderNumber: verifyRes.orderNumber || "ORD-" + mockPaymentId.slice(-6),
+                   orderNumber: verifyRes.orderNumber,
                    planName: selectedPlan.name,
                    amount: total
                  } 
@@ -405,40 +376,9 @@ export default function CheckoutPage() {
       };
 
       if (!(window as any).Razorpay) {
-        console.warn("Razorpay SDK not loaded. Proceeding with sandbox fallback.");
-        const mockPaymentId = `pay_sim_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-        const verifyRes = await RazorpayService.verifyPayment({
-          razorpay_order_id: orderData.id,
-          razorpay_payment_id: mockPaymentId,
-          razorpay_signature: "sandbox_sig_approved",
-          couponCode: appliedCoupon?.code,
-          amount: total,
-          useWallet,
-          usePoints,
-          notes: {
-            userId: currentUser.uid,
-            planId: selectedPlan.id,
-            addressId: selectedAddressId,
-            deliveryFee
-          },
-          customizations: selectedPlan
-        });
-
-        if (verifyRes.success) {
-          showToast("Sandbox Payment Successful!", "success");
-          markTiffinDepositPaid();
-          navigate("/payment-success", { 
-            state: { 
-              orderNumber: verifyRes.orderNumber || "ORD-" + mockPaymentId.slice(-6),
-              planName: selectedPlan.name,
-              amount: total
-            } 
-          });
-        } else {
-          showToast(verifyRes.error || "Sandbox verification failed", "error");
-          navigate("/payment-failed", { state: { error: verifyRes.error, fromState: location.state } });
-        }
         setIsProcessing(false);
+        showToast("Payment window could not load. Please retry.", "error");
+        navigate("/payment-failed", { state: { error: "Razorpay SDK failed to load.", fromState: location.state } });
         return;
       }
 

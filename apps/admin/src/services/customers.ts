@@ -117,7 +117,7 @@ export const customerService = {
       })) as Customer[];
     } catch (error) {
       console.error("Error fetching customers:", error);
-      throw error;
+      return [];
     }
   },
   subscribeCustomers(callback: (customers: Customer[]) => void): () => void {
@@ -135,6 +135,7 @@ export const customerService = {
       callback(customers);
     }, (error) => {
       console.error("Error subscribing to customers:", error);
+      callback([]);
     });
   },
   async updateCustomerStatus(customerId: string, status: 'Active' | 'Suspended'): Promise<void> {

@@ -58,16 +58,7 @@ export function initiateRazorpayPayment(options: {
       };
       document.body.appendChild(script);
     } else {
-      console.log("Initiating Razorpay payment handshake for amount: INR", options.amount / 100);
-      // Simulate payment processing flow
-      setTimeout(() => {
-        options.handler({
-          razorpay_payment_id: "pay_sandbox_" + Math.random().toString(36).substring(2, 11),
-          razorpay_order_id: options.orderId || "order_sandbox_" + Math.random().toString(36).substring(2, 11),
-          razorpay_signature: "sig_sandbox_" + Math.random().toString(36).substring(2, 15)
-        });
-        resolve();
-      }, 1200);
+      reject(new Error("Razorpay is not configured. Payments cannot be completed on this device until checkout keys are available."));
     }
   });
 }

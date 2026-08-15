@@ -247,7 +247,7 @@ export const SubscriptionService = {
     cancellationReason: reason,
     updatedAt: serverTimestamp()
   }),
-  updateDeliveryDetails: (id: string, data: { deliveryAddressId?: string; deliveryTime?: string; deliveryInstructions?: string }) => 
+  updateDeliveryDetails: (id: string, data: { deliveryAddressId?: string; deliveryTime?: string; deliveryInstructions?: string; mealPreference?: string[]; nextDeliveryDate?: string }) => 
     updateDocument('subscriptions', id, { ...data, updatedAt: serverTimestamp() })
 };
 
@@ -655,44 +655,12 @@ export const MealService = {
       const scheduleRef = doc(db, 'mealSchedules', scheduleId);
       const scheduleDoc = await transaction.get(scheduleRef);
       if (!scheduleDoc.exists()) throw new Error("Schedule not found");
-      
-      const walletRef = doc(db, 'wallets', userId);
-      const walletDoc = await transaction.get(walletRef);
-      
-      const refundAmount = 350; // Assume 350 per meal
+      if (scheduleDoc.data().userId !== userId) throw new Error("Unauthorized");
 
       transaction.update(scheduleRef, {
         deliveryStatus: 'skipped',
+        status: 'skipped',
         updatedAt: serverTimestamp()
-      });
-
-      if (walletDoc.exists()) {
-        const newBalance = (walletDoc.data().balance || 0) + refundAmount;
-        transaction.update(walletRef, {
-          balance: newBalance,
-          updatedAt: serverTimestamp()
-        });
-      } else {
-        transaction.set(walletRef, {
-          userId,
-          balance: refundAmount,
-          cashbackAvailable: 0,
-          cashbackPending: 0,
-          cashbackLifetime: 0,
-          updatedAt: serverTimestamp()
-        });
-      }
-      
-      const txRef = doc(collection(db, 'walletTransactions'));
-      transaction.set(txRef, {
-        userId,
-        type: 'credit',
-        amount: refundAmount,
-        reason: 'Refund for skipped meal',
-        referenceId: scheduleId,
-        balanceBefore: walletDoc.exists() ? walletDoc.data().balance || 0 : 0,
-        balanceAfter: (walletDoc.exists() ? walletDoc.data().balance || 0 : 0) + refundAmount,
-        createdAt: serverTimestamp()
       });
     });
   },
@@ -2349,21 +2317,23 @@ export const MealItemService = {
 */
 
 export const RazorpayService = {
-  createOrder: async (planId: string, customizations: any, couponCode: string | undefined, deliveryFee: number, userId: string, addressId: string) => {
+  createOrder: async (planId: string, customizations: any, couponCode: string | undefined, deliveryFee: number, userId: string, addressId: string, extra?: { purpose?: string; existingSubscriptionId?: string }) => {
     const headers = await getAuthHeaders();
     const response = await fetch('/api/payments/create-order', {
       method: 'POST',
       headers,
       body: JSON.stringify({ 
         planId,
-        customizations,
         couponCode,
-        deliveryFee,
-        notes: { userId, planId, addressId, deliveryFee } 
+        addressId,
+        purpose: extra?.purpose || 'subscription',
+        existingSubscriptionId: extra?.existingSubscriptionId,
+        notes: { userId, planId, addressId } 
       })
     });
-    if (!response.ok) throw new Error('Failed to create payment order');
-    return response.json();
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || 'Failed to create payment order');
+    return payload;
   },
   verifyPayment: async (data: {
     razorpay_order_id: string;

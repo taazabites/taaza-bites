@@ -14,6 +14,7 @@ export const expenseService = {
       callback(expenses);
     }, (error) => {
       console.error("Error subscribing to expenses:", error);
+      callback([]);
     });
   },
 

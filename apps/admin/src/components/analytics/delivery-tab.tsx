@@ -11,14 +11,12 @@ interface DeliveryTabProps {
 }
 
 export default function DeliveryTab({ deliveryPartners, deliveries }: DeliveryTabProps) {
-  const driverPerformance = getDriverPerformance();
-
-  // Compute stats
+  const driverPerformance = getDriverPerformance(deliveryPartners, deliveries);
   const totalDeliveriesCount = deliveries.length;
-  const completedDeliveriesCount = deliveries.filter(d => d.status === 'Delivered').length;
-  const successRate = totalDeliveriesCount > 0 
-    ? Math.round((completedDeliveriesCount / totalDeliveriesCount) * 100) 
-    : 98; // Fallback success rate
+  const completedDeliveriesCount = deliveries.filter((d) => d.status === "Delivered").length;
+  const successRate = totalDeliveriesCount > 0
+    ? Math.round((completedDeliveriesCount / totalDeliveriesCount) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -41,8 +39,8 @@ export default function DeliveryTab({ deliveryPartners, deliveries }: DeliveryTa
             <Bike className="w-4 h-4 text-amber-500" />
           </CardHeader>
           <CardContent className="p-3 pt-0">
-            <div className="text-2xl font-bold text-white">32.4 mins</div>
-            <p className="text-[10px] text-zinc-500 mt-1">Average time from kitchen dispatch to door-step</p>
+            <div className="text-2xl font-bold text-white">—</div>
+            <p className="text-[10px] text-zinc-500 mt-1">Shown when pickup and drop timestamps exist</p>
           </CardContent>
         </Card>
 
@@ -98,7 +96,7 @@ export default function DeliveryTab({ deliveryPartners, deliveries }: DeliveryTa
                       <TableCell>
                         <div className="flex items-center gap-1.5 text-yellow-500 font-semibold font-mono">
                           <Star className="w-3.5 h-3.5 fill-yellow-500/20 text-yellow-500" />
-                          {rider.rating.toFixed(1)}
+                          {rider.rating > 0 ? rider.rating.toFixed(1) : "—"}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

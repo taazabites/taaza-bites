@@ -25,11 +25,11 @@ export function RazorpayReconciliationTab({ payments }: RazorpayReconciliationTa
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-xl border border-border">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Razorpay Settlement & Reconciliation</h2>
-          <p className="text-sm text-slate-500">Cross-examine internal subscription database records with official Razorpay gateway settlements.</p>
-          <p className="text-xs text-emerald-600 mt-1 font-medium">Last Reconciled: {lastReconciled}</p>
+          <h2 className="text-xl font-bold text-foreground">Razorpay Settlement & Reconciliation</h2>
+          <p className="text-sm text-muted-foreground">Cross-examine internal subscription database records with official Razorpay gateway settlements.</p>
+          <p className="text-xs text-emerald-400 mt-1 font-medium">Last Reconciled: {lastReconciled}</p>
         </div>
         <Button onClick={handleRunReconciliation} disabled={reconciling} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
           {reconciling ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
@@ -38,39 +38,39 @@ export function RazorpayReconciliationTab({ payments }: RazorpayReconciliationTa
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-emerald-100 bg-emerald-50/20">
+        <Card className="border-emerald-500/25 bg-emerald-500/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-900">Matched Settlements</CardTitle>
+            <CardTitle className="text-sm font-medium text-emerald-200">Matched Settlements</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-950">
+            <div className="text-2xl font-bold text-white">
               {payments.filter(p => p.status === 'Success').length} Transactions
             </div>
-            <p className="text-xs text-emerald-700 mt-1">Fully verified against Razorpay payout IDs</p>
+            <p className="text-xs text-emerald-300/90 mt-1">Fully verified against Razorpay payout IDs</p>
           </CardContent>
         </Card>
 
-        <Card className="border-amber-100 bg-amber-50/20">
+        <Card className="border-amber-500/25 bg-amber-500/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-amber-900">Pending Gateway Verification</CardTitle>
+            <CardTitle className="text-sm font-medium text-amber-200">Pending Gateway Verification</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-950">
+            <div className="text-2xl font-bold text-white">
               {payments.filter(p => p.status === 'Pending').length} Transactions
             </div>
-            <p className="text-xs text-amber-700 mt-1">Awaiting webhook callback or signature check</p>
+            <p className="text-xs text-amber-300/90 mt-1">Awaiting webhook callback or signature check</p>
           </CardContent>
         </Card>
 
-        <Card className="border-red-100 bg-red-50/20">
+        <Card className="border-rose-500/25 bg-rose-500/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-900">Discrepancies / Failed</CardTitle>
+            <CardTitle className="text-sm font-medium text-rose-200">Discrepancies / Failed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-950">
+            <div className="text-2xl font-bold text-white">
               {payments.filter(p => p.status === 'Failed').length} Transactions
             </div>
-            <p className="text-xs text-red-700 mt-1">Requires manual audit or customer retry</p>
+            <p className="text-xs text-rose-300/90 mt-1">Requires manual audit or customer retry</p>
           </CardContent>
         </Card>
       </div>
@@ -96,7 +96,7 @@ export function RazorpayReconciliationTab({ payments }: RazorpayReconciliationTa
               {payments.slice(0, 10).map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-mono text-xs">{p.paymentId || p.id.substring(0, 8)}</TableCell>
-                  <TableCell className="font-mono text-xs text-slate-500">{p.razorpayOrderId || 'order_mock_' + Math.floor(Math.random() * 100000)}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{p.razorpayOrderId || 'order_mock_' + Math.floor(Math.random() * 100000)}</TableCell>
                   <TableCell className="font-medium">{p.customerName || 'Customer'}</TableCell>
                   <TableCell className="font-semibold">₹{p.amount?.toLocaleString('en-IN')}</TableCell>
                   <TableCell>
@@ -106,11 +106,11 @@ export function RazorpayReconciliationTab({ payments }: RazorpayReconciliationTa
                   </TableCell>
                   <TableCell>
                     {p.status === 'Success' ? (
-                      <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
+                      <span className="flex items-center gap-1 text-emerald-400 text-xs font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Reconciled
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-amber-600 text-xs font-medium">
+                      <span className="flex items-center gap-1 text-amber-400 text-xs font-medium">
                         <AlertTriangle className="w-3.5 h-3.5" /> Review Needed
                       </span>
                     )}

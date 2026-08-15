@@ -50,8 +50,10 @@ import { branchService } from "../services/branches"
 import { SubscriptionsNavTabs } from "../components/subscriptions-nav-tabs"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "motion/react"
+import { useSearchParams } from "react-router-dom"
 
 export default function SubscriptionsPage() {
+  const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [subscriptions, setSubscriptions] = useState<any[]>([])
@@ -67,6 +69,11 @@ export default function SubscriptionsPage() {
   // Quick-edit state for meal balance
   const [editingSubId, setEditingSubId] = useState<string | null>(null)
   const [editMealCount, setEditMealCount] = useState<number>(0)
+
+  useEffect(() => {
+    const status = searchParams.get("status")
+    if (status) setFilters((prev) => ({ ...prev, status }))
+  }, [searchParams])
 
   useEffect(() => {
     setLoading(true)
@@ -217,8 +224,9 @@ export default function SubscriptionsPage() {
                 >
                   <option value="">All Statuses</option>
                   <option value="Active">Active</option>
+                  <option value="Pending">Pending</option>
                   <option value="Paused">Paused</option>
-                  <option value="Completed">Completed</option>
+                  <option value="Expired">Expired</option>
                   <option value="Cancelled">Cancelled</option>
                 </select>
               </div>

@@ -2,79 +2,114 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Roles: admin, kitchen, deliveryPartner, crm, customer
-    
-    function isAuthenticated() {
+    function signedIn() {
       return request.auth != null;
     }
-    
+
     function isPartner() {
-      return isAuthenticated() && exists(/databases/$(database)/documents/deliveryPartners/$(request.auth.uid));
+      return signedIn() && exists(/databases/$(database)/documents/deliveryPartners/$(request.auth.uid));
     }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+
+    function partnerDoc() {
+      return get(/databases/$(database)/documents/deliveryPartners/$(request.auth.uid)).data;
+    }
+
+    function notSuspended() {
+      return isPartner()
+        && partnerDoc().get('active', true) == true
+        && partnerDoc().get('isBlocked', false) != true
+        && partnerDoc().get('currentStatus', 'OFFLINE') != 'SUSPENDED';
+    }
+
+    function ownDelivery() {
+      return resource.data.partnerId == request.auth.uid
+        || resource.data.driverId == request.auth.uid;
+    }
+
+    function legalTransition() {
+      let from = resource.data.status;
+      let to = request.resource.data.status;
+      return from == to
+        || (from == 'ASSIGNED' && to in ['ACCEPTED', 'FAILED', 'CANCELLED', 'RETURN_TO_KITCHEN'])
+        || (from == 'ACCEPTED' && to in ['PICKED_UP', 'FAILED', 'CANCELLED', 'RETURN_TO_KITCHEN'])
+        || (from == 'PICKED_UP' && to in ['OUT_FOR_DELIVERY', 'FAILED', 'RETURN_TO_KITCHEN'])
+        || (from == 'OUT_FOR_DELIVERY' && to in ['ARRIVED', 'FAILED', 'RETURN_TO_KITCHEN'])
+        || (from == 'ARRIVED' && to in ['FAILED', 'RETURN_TO_KITCHEN']);
+    }
+
+    function deliveryProtectedUnchanged() {
+      return request.resource.data.partnerId == resource.data.partnerId
+        && request.resource.data.orderId == resource.data.orderId
+        && request.resource.data.get('paymentStatus', '') == resource.data.get('paymentStatus', '')
+        && request.resource.data.get('customerId', '') == resource.data.get('customerId', '')
+        && request.resource.data.status != 'DELIVERED';
     }
 
     match /deliveryPartners/{partnerId} {
-      allow read: if isAuthenticated();
-      allow write: if isOwner(partnerId);
+      allow read: if signedIn() && request.auth.uid == partnerId;
+      allow create: if false;
+      allow update: if signedIn() && request.auth.uid == partnerId
+        && resource.data.get('currentStatus', '') != 'SUSPENDED'
+        && request.resource.data.get('name', '') == resource.data.get('name', '')
+        && request.resource.data.get('phone', '') == resource.data.get('phone', '')
+        && request.resource.data.get('vehicleType', '') == resource.data.get('vehicleType', '')
+        && request.resource.data.get('vehicleNumber', '') == resource.data.get('vehicleNumber', '')
+        && request.resource.data.get('active', true) == resource.data.get('active', true)
+        && request.resource.data.currentStatus in ['ONLINE', 'OFFLINE', 'ON_DELIVERY'];
+      allow delete: if false;
     }
 
-    match /deliveryAssignments/{assignmentId} {
-      allow read: if isPartner();
-      allow write: if isPartner();
+    match /deliveries/{deliveryId} {
+      allow read: if isPartner() && ownDelivery();
+      allow create: if false;
+      allow update: if notSuspended() && ownDelivery() && legalTransition() && deliveryProtectedUnchanged();
+      allow delete: if false;
     }
-    
-    match /deliveryTracking/{trackingId} {
-      allow read: if isAuthenticated();
-      allow write: if isPartner();
+
+    match /deliveryEvents/{eventId} {
+      allow read: if isPartner() && resource.data.partnerId == request.auth.uid;
+      allow create: if notSuspended()
+        && request.resource.data.partnerId == request.auth.uid
+        && request.resource.data.type in ['STATUS', 'ISSUE', 'PICKUP'];
+      allow update, delete: if false;
     }
-    
-    match /deliveryAttendance/{attendanceId} {
-      allow read: if isPartner();
-      allow write: if isPartner();
+
+    match /deliveryEarnings/{earningId} {
+      allow read: if isPartner() && resource.data.partnerId == request.auth.uid;
+      allow write: if false;
     }
-    
-    match /deliveryStatus/{statusId} {
-      allow read: if isAuthenticated();
-      allow write: if isPartner();
-    }
-    
-    match /deliveryProofs/{proofId} {
-      allow read: if isAuthenticated();
-      allow write: if isPartner();
-    }
-    
-    match /deliveryRatings/{ratingId} {
-      allow read: if isAuthenticated();
-      allow write: if isPartner(); // Partners can read their own, assuming filtering
-    }
-    
+
     match /deliveryIssues/{issueId} {
-      allow read: if isPartner();
-      allow write: if isPartner();
+      allow read: if isPartner() && resource.data.reportedBy == request.auth.uid;
+      allow create: if notSuspended() && request.resource.data.reportedBy == request.auth.uid;
+      allow update, delete: if false;
     }
-    
-    match /deliveryVehicles/{vehicleId} {
-      allow read: if isPartner();
-      allow write: if isOwner(vehicleId);
+
+    match /deliverySecrets/{id} {
+      allow read, write: if false;
     }
-    
-    match /deliveryDocuments/{documentId} {
-      allow read: if isPartner();
-      allow write: if isOwner(documentId);
+
+    match /partnerNotifications/{id} {
+      allow read: if isPartner() && resource.data.partnerId == request.auth.uid;
+      allow update: if isPartner()
+        && resource.data.partnerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false;
     }
-    
-    match /deliverySettlements/{settlementId} {
+
+    match /deliverySettings/{id} {
       allow read: if isPartner();
-      allow write: if isOwner(settlementId);
+      allow write: if false;
     }
-    
-    match /notifications/{notificationId} {
-      allow read: if isPartner();
-      allow write: if false; // Assuming admins write notifications
+
+    match /deliveryTracking/{id} {
+      allow read: if isPartner() && resource.data.partnerId == request.auth.uid;
+      allow create: if notSuspended() && request.resource.data.partnerId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

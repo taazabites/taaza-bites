@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -18,6 +18,11 @@ import { PageTransition } from "../components/dashboard/PageTransition";
 import { WeeklyMenuPreview } from "../components/subscription/WeeklyMenuPreview";
 import { CouponModule } from "../components/CouponModule";
 import { PlansPageSkeleton, TextBlockSkeleton } from "../components/common/SkeletonLibrary";
+import { LivePlanGrid } from "../components/plans/LivePlanGrid";
+import { useSubscriptionPlans } from "../lib/plans-cache";
+import { normalizePlan, type NormalizedPlan } from "../lib/plan-normalize";
+import { trackFunnel } from "../lib/funnel-analytics";
+import { Analytics } from "../utils/analytics";
 
 const INITIAL_STATE: OnboardingState = {
   age: "", gender: "", height: "", weight: "", activity: "moderate",
@@ -58,7 +63,19 @@ export default function Plans() {
   const { currentUser } = useAuth();
   const { showToast } = useToast();
 
-  const [step, setStep] = useState(location.state?.fromState ? 8 : 1);
+  const { plans: rawPlans, loading: plansLoading } = useSubscriptionPlans();
+  const livePlans = useMemo(
+    () => (rawPlans || []).map(normalizePlan).filter((p) => p.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [rawPlans]
+  );
+  const params = new URLSearchParams(location.search);
+  const fromAssessment = params.get("from") === "assessment";
+  const mode = params.get("mode") || "subscribe";
+  const existingSubscriptionId = params.get("subscriptionId") || "";
+  const recommendedId = params.get("recommended") || "";
+  const [selectedLivePlan, setSelectedLivePlan] = useState<NormalizedPlan | null>(null);
+  const [plansError, setPlansError] = useState<string | null>(null);
+  const [step, setStep] = useState(location.state?.fromState ? 8 : (fromAssessment || mode === "upgrade" || mode === "renew" || mode === "downgrade" ? 7 : 1));
   const [state, setState] = useState<OnboardingState>(location.state?.fromState || INITIAL_STATE);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -91,10 +108,16 @@ export default function Plans() {
   };
 
   useEffect(() => {
-    MealItemService.seedMealItems().catch(err => {
-      console.error("Error seeding meal items on mount:", err);
-    });
-  }, []);
+    Analytics.trackSubscriptionView();
+    trackFunnel("subscription_view", { mode });
+  }, [mode]);
+
+  useEffect(() => {
+    if (!selectedLivePlan && livePlans.length) {
+      const rec = livePlans.find((p) => p.id === recommendedId) || livePlans.find((p) => p.popular) || livePlans[0];
+      setSelectedLivePlan(rec);
+    }
+  }, [livePlans, recommendedId, selectedLivePlan]);
 
   useEffect(() => {
     if (currentUser) {
@@ -198,152 +221,97 @@ export default function Plans() {
       return;
     }
 
-    if (duration === 3 && !isNewUser) {
-      showToast("The 3-day trial plan is exclusively for first-time customers.", "error");
-      setIsProcessing(false);
+    if (!selectedLivePlan) {
+      showToast("Select a live plan from the list first.", "error");
       return;
     }
-    
-    setIsProcessing(true);
-    const selectedPlan = {
-      id: `custom_${duration}_${state.goal.replace(/\s+/g, '_').toLowerCase()}`,
-      name: `${state.goal} Plan`,
-      durationDays: duration,
-      mealsPerDay: mealCountMultiplier,
-      totalMeals: duration * mealCountMultiplier,
-      dietType: state.foodPreference,
-      goal: state.goal,
-      calories: stats.recommendedCalories,
-      protein: stats.recommendedProtein,
-      price: rawPrice,
-      offerPrice: offerPrice
-    };
 
     if (!selectedAddressId) {
       showToast("Please provide a delivery address.", "error");
       setIsProcessing(false);
       return;
     }
+    
+    setIsProcessing(true);
+    const selectedPlan = selectedLivePlan;
+    Analytics.trackPlanSelected(selectedPlan.id, selectedPlan.planName);
+    trackFunnel("checkout_started", { planId: selectedPlan.id, planName: selectedPlan.planName });
 
     try {
-      if (total === 0) {
-        const res = await RazorpayService.activateZeroOrder({
-          userId: currentUser.uid,
-          planId: selectedPlan.id,
-          addressId: selectedAddressId,
-          walletDeduction: useWallet ? walletValue : 0,
-          pointsDeduction: usePoints ? (pointsValue * 10) : 0,
-          couponCode: appliedCoupon?.isReferral ? undefined : appliedCoupon?.code,
-          deliveryFee,
-          customizations: { ...state, ...selectedPlan }
+      Analytics.trackPaymentStarted(selectedPlan.id, selectedPlan.planName, selectedPlan.offerPrice);
+      trackFunnel("payment_started", { planId: selectedPlan.id });
+      const purpose = mode === "upgrade" || mode === "downgrade" ? "upgrade" : mode === "renew" ? "renewal" : "subscription";
+      const orderData = await RazorpayService.createOrder(
+        selectedPlan.id,
+        null,
+        appliedCoupon?.isReferral ? undefined : appliedCoupon?.code,
+        0,
+        currentUser.uid,
+        selectedAddressId,
+        { purpose, existingSubscriptionId: existingSubscriptionId || undefined }
+      );
+
+      if (!(window as any).Razorpay) {
+        await new Promise((resolve) => {
+          const script = document.createElement("script");
+          script.src = "https://checkout.razorpay.com/v1/checkout.js";
+          script.onload = () => resolve(true);
+          script.onerror = () => resolve(false);
+          document.body.appendChild(script);
         });
-        if (res.success) {
-          navigate("/payment-success", { state: { orderNumber: res.orderNumber, planName: selectedPlan.name, amount: 0, plan: selectedPlan } });
-        }
-        return;
+      }
+      if (!(window as any).Razorpay) {
+        throw new Error("Payment window could not load. Check your connection and retry.");
       }
 
-      const orderData = await RazorpayService.createOrder(total, currentUser.uid, selectedPlan.id, selectedAddressId, deliveryFee);
-      
-      if (orderData.isSandbox) {
-        const verifyRes = await RazorpayService.verifyPayment({
-          razorpay_order_id: orderData.id,
-          razorpay_payment_id: `pay_sim_${Math.random().toString(36).substring(2, 9)}`,
-          razorpay_signature: "sandbox_sig",
-          couponCode: appliedCoupon?.isReferral ? undefined : appliedCoupon?.code,
-          amount: total,
-          useWallet,
-          usePoints,
-          notes: { userId: currentUser.uid, planId: selectedPlan.id, deliveryFee, addressId: selectedAddressId },
-          customizations: { ...state, ...selectedPlan }
-        });
-
-        if (verifyRes.success) {
-          navigate("/payment-success", { state: { orderNumber: verifyRes.orderNumber, planName: selectedPlan.name, amount: total, plan: selectedPlan } });
-        } else {
-          navigate("/payment-issue", { state: { error: verifyRes.error || "Payment verification failed. Please try again.", fromState: state } });
-        }
-      } else {
-        if (!(window as any).Razorpay) {
-          await new Promise((resolve) => {
-            const script = document.createElement("script");
-            script.src = "https://checkout.razorpay.com/v1/checkout.js";
-            script.onload = () => resolve(true);
-            script.onerror = () => resolve(false);
-            document.body.appendChild(script);
-          });
-        }
-
-        const options = {
-          key: orderData.keyId || "rzp_test_mock_key",
-          amount: orderData.amount,
-          currency: orderData.currency || "INR",
-          name: "Taaza Bites",
-          description: `${selectedPlan.name} Subscription`,
-          order_id: orderData.id,
-          handler: async function (response: any) {
-            try {
-              const verifyRes = await RazorpayService.verifyPayment({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                couponCode: appliedCoupon?.isReferral ? undefined : appliedCoupon?.code,
-                amount: total,
-                useWallet,
-                usePoints,
-                notes: { userId: currentUser.uid, planId: selectedPlan.id, deliveryFee },
-                customizations: { ...state, ...selectedPlan }
-              });
-              if (verifyRes.success) {
-                navigate("/payment-success", { state: { orderNumber: verifyRes.orderNumber, planName: selectedPlan.name, amount: total, plan: selectedPlan } });
-              } else {
-                navigate("/payment-issue", { state: { error: verifyRes.error || "Payment verification failed", fromState: state } });
-              }
-            } catch (err: any) {
-              navigate("/payment-issue", { state: { error: err.message || "Verification failed", fromState: state } });
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency || "INR",
+        name: "Taaza Bites",
+        description: `${selectedPlan.planName} Subscription`,
+        order_id: orderData.id,
+        handler: async function (response: any) {
+          try {
+            const verifyRes = await RazorpayService.verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              couponCode: appliedCoupon?.isReferral ? undefined : appliedCoupon?.code,
+              amount: selectedPlan.offerPrice,
+              notes: { userId: currentUser.uid, planId: selectedPlan.id, addressId: selectedAddressId },
+            });
+            if (verifyRes.success) {
+              trackFunnel(purpose === "renewal" ? "subscription_renewed" : "subscription_activated", { planId: selectedPlan.id });
+              navigate("/payment-success", { state: { orderNumber: verifyRes.orderNumber, planName: selectedPlan.planName, amount: selectedPlan.offerPrice, plan: selectedPlan } });
+            } else {
+              Analytics.trackPaymentFailed(selectedPlan.id, verifyRes.error);
+              navigate("/payment-issue", { state: { error: verifyRes.error || "Payment verification failed", fromState: state } });
             }
-          },
-          prefill: {
-            name: currentUser.displayName || "",
-            email: currentUser.email || "",
-            contact: currentUser.phoneNumber || ""
-          },
-          modal: {
-            ondismiss: function () {
-              setIsProcessing(false);
-              showToast("Payment window closed", "info");
-            }
+          } catch (err: any) {
+            Analytics.trackPaymentFailed(selectedPlan.id, err.message);
+            navigate("/payment-issue", { state: { error: err.message || "Verification failed", fromState: state } });
           }
-        };
-
-        try {
-          const rzp = new (window as any).Razorpay(options);
-          rzp.open();
-        } catch (err) {
-          console.warn("Razorpay SDK launch failed, using fallback:", err);
-          const verifyRes = await RazorpayService.verifyPayment({
-            razorpay_order_id: orderData.id,
-            razorpay_payment_id: `pay_sim_${Math.random().toString(36).substring(2, 9)}`,
-            razorpay_signature: "sandbox_sig",
-            couponCode: appliedCoupon?.code,
-            amount: total,
-            useWallet,
-            usePoints,
-            notes: { userId: currentUser.uid, planId: selectedPlan.id, deliveryFee },
-            customizations: { ...state, ...selectedPlan }
-          });
-          if (verifyRes.success) {
-            navigate("/payment-success", { state: { orderNumber: verifyRes.orderNumber, planName: selectedPlan.name, amount: total, plan: selectedPlan } });
-          } else {
-            navigate("/payment-issue", { state: { error: verifyRes.error || "Payment verification failed", fromState: state } });
+        },
+        prefill: {
+          name: currentUser.displayName || "",
+          email: currentUser.email || "",
+          contact: currentUser.phoneNumber || ""
+        },
+        modal: {
+          ondismiss: function () {
+            setIsProcessing(false);
+            showToast("Payment window closed", "info");
           }
         }
-      }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     } catch (err: any) {
-      console.error(err);
-      navigate("/payment-issue", { state: { error: err.message || "Unable to process order. Please try again.", fromState: state } });
-    } finally {
       setIsProcessing(false);
+      Analytics.trackPaymentFailed(selectedPlan.id, err.message);
+      showToast(err.message || "Could not start payment. Please retry.", "error");
     }
   };
 
@@ -706,7 +674,7 @@ export default function Plans() {
                   <div className="pt-6 border-t border-emerald-800/60 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider mb-1">Starting From</p>
-                      <p className="text-3xl font-black text-white">₹{basePricePerDay} <span className="text-sm font-normal text-emerald-200">/ meal day</span></p>
+                      <p className="text-3xl font-black text-white">â‚¹{basePricePerDay} <span className="text-sm font-normal text-emerald-200">/ meal day</span></p>
                     </div>
                     <Button 
                       onClick={nextStep} 
@@ -900,167 +868,36 @@ export default function Plans() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[
-                  { days: 3 as const, label: "3-Day Trial", savings: 0, tag: "New User Special", desc: "Experience 3 days of clinical nutrition with full flexibility." },
-                  { days: 7 as const, label: "Weekly Plan", savings: 5, tag: "Most Flexible", desc: "A full week of structured nutrition to reset your habits." },
-                  { days: 15 as const, label: "15-Day Plan", savings: 10, tag: "Results Oriented", desc: "15 days of clinical nutrition for visible health improvements." },
-                  { days: 30 as const, label: "Monthly Plan", savings: 15, tag: "Best Value", desc: "The recommended duration for biological adaptation and sustainable results." }
-                ].map((plan) => {
-                  const isTrial = plan.days === 3;
-                  const isSelected = duration === plan.days;
-                  const planRawPrice = basePricePerDay * mealCountMultiplier * plan.days;
-                  const planOfferPrice = Math.round(planRawPrice * (1 - plan.savings / 100));
-                  const pricePerDay = Math.round(planOfferPrice / plan.days);
-                  const totalSavings = planRawPrice - planOfferPrice;
-                  const isDisabled = isTrial && !isNewUser;
-
-                  return (
-                    <Card 
-                      key={plan.days}
-                      onClick={() => {
-                        if (isDisabled) {
-                          showToast("The 3-day trial plan is exclusively for first-time customers.", "info");
-                          return;
-                        }
-                        setDuration(plan.days);
-                      }}
-                      className={cn(
-                        "p-6 md:p-8 rounded-3xl border-2 transition-all relative overflow-hidden shadow-sm group",
-                        isDisabled 
-                          ? "border-zinc-200 bg-zinc-50/50 opacity-60 cursor-not-allowed select-none dark:bg-zinc-900/50 dark:border-zinc-800" 
-                          : isSelected 
-                          ? "border-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-md" 
-                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700 cursor-pointer"
-                      )}
-                    >
-                      {isSelected && !isDisabled && (
-                        <div className="absolute top-0 right-0 px-4 py-1.5 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-bl-2xl">
-                          Selected
-                        </div>
-                      )}
-                      
-                      {!isSelected && !isDisabled && plan.tag && (
-                        <div className="absolute top-0 right-0 px-4 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px] font-black uppercase tracking-widest rounded-bl-2xl">
-                          {plan.tag}
-                        </div>
-                      )}
-
-                      {isDisabled && (
-                         <div className="absolute top-0 right-0 px-4 py-1.5 bg-zinc-500 text-white text-[10px] font-black uppercase tracking-widest rounded-bl-2xl flex items-center gap-1.5">
-                           <Lock className="w-3 h-3" /> Locked
-                         </div>
-                      )}
-
-                      <div className="space-y-6">
-                        <div>
-                          <h3 className="text-2xl font-black text-zinc-900 dark:text-white">{plan.label}</h3>
-                          <p className="text-zinc-500 font-bold text-xs uppercase tracking-widest mt-1">{plan.days} Days Commitment</p>
-                        </div>
-
-                        <p className="text-zinc-500 dark:text-zinc-400 text-xs font-semibold">{plan.desc}</p>
-
-                        <div className="space-y-1">
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-4xl font-black text-zinc-900 dark:text-white">₹{planOfferPrice}</span>
-                            {plan.savings > 0 && (
-                              <span className="text-zinc-400 line-through font-bold text-sm">₹{planRawPrice}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                             <span className="text-emerald-600 font-black text-sm">₹{pricePerDay}/day</span>
-                             {plan.savings > 0 && (
-                               <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest">
-                                 Save ₹{totalSavings}
-                               </span>
-                             )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                          <div className="space-y-0.5">
-                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Calories</p>
-                            <p className="text-sm font-black text-zinc-900 dark:text-white">{stats.recommendedCalories} kcal</p>
-                          </div>
-                          <div className="space-y-0.5">
-                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Protein</p>
-                            <p className="text-sm font-black text-zinc-900 dark:text-white">{stats.recommendedProtein}g</p>
-                          </div>
-                          <div className="space-y-0.5">
-                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Diet</p>
-                            <p className="text-sm font-black text-zinc-900 dark:text-white">{state.foodPreference}</p>
-                          </div>
-                          <div className="space-y-0.5">
-                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Total Meals</p>
-                            <p className="text-sm font-black text-zinc-900 dark:text-white">{plan.days * mealCountMultiplier}</p>
-                          </div>
-                        </div>
-
-                        <ul className="space-y-2">
-                          {[
-                            "Daily Doorstep Delivery",
-                            plan.days >= 15 ? "Pause/Resume Anytime" : "Standard Flexibility",
-                            "Nutritionist Consultation"
-                          ].map((feat, idx) => (
-                            <li key={idx} className="flex items-center gap-2 text-xs font-bold text-zinc-600 dark:text-zinc-400">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                              {feat}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-                <Card className={cn(
-                    "p-6 md:p-8 rounded-[2.5rem] border transition-all duration-300",
-                    duration === 30 ? "bg-zinc-950 border-emerald-900/30 text-white" : "bg-white border-zinc-100 text-zinc-900 shadow-sm"
-                )}>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="space-y-2">
-                        <h4 className="text-sm font-black uppercase tracking-widest text-emerald-500">Subscription Benefits</h4>
-                        <p className="text-xl font-black tracking-tight">Your {duration}-Day {duration === 30 ? 'Elite' : 'Basic'} Plan Benefits</p>
-                    </div>
-                    <div className={cn(
-                        "grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 md:pt-0 md:border-t-0 border-t",
-                        duration === 30 ? "border-zinc-800" : "border-zinc-100"
-                    )}>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-emerald-500/10 p-2 rounded-xl">
-                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                            </div>
-                            <span className="text-xs font-bold">Priority Support</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-emerald-500/10 p-2 rounded-xl">
-                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                            </div>
-                            <span className="text-xs font-bold">Free Delivery</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-emerald-500/10 p-2 rounded-xl">
-                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                            </div>
-                            <span className="text-xs font-bold">Pause Anytime</span>
-                        </div>
-                    </div>
-                  </div>
-                </Card>
+              <LivePlanGrid
+                plans={livePlans}
+                selectedId={selectedLivePlan?.id}
+                recommendedId={recommendedId}
+                loading={plansLoading}
+                error={livePlans.length === 0 && !plansLoading ? "No active plans found in Firestore." : plansError}
+                onRetry={() => setPlansError(null)}
+                onSelect={(plan) => {
+                  setSelectedLivePlan(plan);
+                  trackFunnel("plan_selected", { planId: plan.id, planName: plan.planName });
+                }}
+              />
 
               <div className="pt-4">
                 <Button 
                   onClick={() => {
+                    if (!selectedLivePlan) {
+                      showToast("Please choose a plan to continue.", "info");
+                      return;
+                    }
                     if (!currentUser) {
                       showToast("Please log in to proceed.", "info");
-                      navigate('/login');
+                      navigate('/login', { state: { from: location } });
                     } else {
                       nextStep();
                     }
                   }} 
                   className="w-full h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-black shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
                 >
-                  Proceed to Order Summary <ArrowRight className="h-5 w-5" />
+                  Continue to checkout <ArrowRight className="h-5 w-5" />
                 </Button>
               </div>
             </motion.div>
@@ -1220,7 +1057,7 @@ export default function Plans() {
                           <WalletIcon className={cn("w-4 h-4", useWallet ? "text-emerald-700" : "text-zinc-500")} />
                           <span className="text-xs font-extrabold text-zinc-700 uppercase">Wallet</span>
                         </div>
-                        <p className="text-base font-black text-zinc-900">₹{wallet?.balance || 0}</p>
+                        <p className="text-base font-black text-zinc-900">â‚¹{wallet?.balance || 0}</p>
                       </button>
 
                       <button 
@@ -1275,27 +1112,27 @@ export default function Plans() {
                       <div className="relative z-10 space-y-6">
                         <motion.div layout>
                           <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-400 mb-1">Metabolic Protocol</p>
-                          <h3 className="text-2xl font-black">{state.healthGoal} {duration}-Day Plan</h3>
+                          <h3 className="text-2xl font-black">{state.goal} {selectedLivePlan?.durationDays || duration}-Day Plan</h3>
                           <p className="text-zinc-400 text-xs font-medium mt-1">
-                             {state.foodPreference} • {state.mealsPerDay} per day
+                             {state.foodPreference} â€¢ {state.mealsPerDay} per day
                           </p>
                         </motion.div>
 
                         <div className="grid grid-cols-2 gap-4 py-4 border-y border-white/5">
                            <div className="space-y-0.5">
                               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Price/Day</p>
-                              <p className="text-lg font-black text-emerald-400">₹{Math.round(offerPrice / duration)}</p>
+                              <p className="text-lg font-black text-emerald-400">â‚¹{Math.round(offerPrice / duration)}</p>
                            </div>
                            <div className="space-y-0.5">
                               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Total Savings</p>
-                              <p className="text-lg font-black text-emerald-400">₹{Math.round(basePricePerDay * mealCountMultiplier * duration - offerPrice + discountAmount)}</p>
+                              <p className="text-lg font-black text-emerald-400">â‚¹{Math.round(basePricePerDay * mealCountMultiplier * duration - offerPrice + discountAmount)}</p>
                            </div>
                         </div>
 
                         <div className="space-y-3 pb-4 text-sm font-medium">
                           <motion.div layout className="flex justify-between">
                             <span className="text-zinc-400">Subscription Rate</span>
-                            <span className="font-bold text-white">₹{offerPrice}</span>
+                            <span className="font-bold text-white">â‚¹{offerPrice}</span>
                           </motion.div>
                           <AnimatePresence>
                             {discountAmount > 0 && (
@@ -1307,17 +1144,17 @@ export default function Plans() {
                                 className="flex justify-between text-emerald-400"
                               >
                                 <span>Coupon Discount</span>
-                                <span className="font-bold">-₹{discountAmount}</span>
+                                <span className="font-bold">-â‚¹{discountAmount}</span>
                               </motion.div>
                             )}
                           </AnimatePresence>
                           <motion.div layout className="flex justify-between">
                             <span className="text-zinc-400">Delivery Fee</span>
-                            <span className="font-bold text-white">₹{deliveryFee}</span>
+                            <span className="font-bold text-white">â‚¹{deliveryFee}</span>
                           </motion.div>
                           <motion.div layout className="flex justify-between">
                             <span className="text-zinc-400">GST Tax (5%)</span>
-                            <span className="font-bold text-white">₹{taxes}</span>
+                            <span className="font-bold text-white">â‚¹{taxes}</span>
                           </motion.div>
                           <AnimatePresence>
                             {(useWallet || usePoints) && (
@@ -1329,7 +1166,7 @@ export default function Plans() {
                                 className="flex justify-between text-emerald-400 pt-2 border-t border-zinc-800 overflow-hidden"
                               >
                                 <span>Credits Applied</span>
-                                <span className="font-bold">-₹{walletValue + pointsValue}</span>
+                                <span className="font-bold">-â‚¹{walletValue + pointsValue}</span>
                               </motion.div>
                             )}
                           </AnimatePresence>
@@ -1343,7 +1180,7 @@ export default function Plans() {
                             animate={{ scale: 1, color: "#34d399" }}
                             className="text-3xl font-black"
                           >
-                            ₹{total}
+                            â‚¹{total}
                           </motion.span>
                         </div>
 
@@ -1356,7 +1193,7 @@ export default function Plans() {
                             <Loader2 className="w-6 h-6 animate-spin" />
                           ) : (
                             <>
-                              Pay ₹{total} & Confirm Order <ArrowRight className="w-5 h-5" />
+                              Pay â‚¹{total} & Confirm Order <ArrowRight className="w-5 h-5" />
                             </>
                           )}
                         </Button>

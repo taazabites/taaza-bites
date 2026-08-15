@@ -196,7 +196,20 @@ export const Analytics = {
     trackEvent('begin_checkout', 'ecommerce', { planId, planName, price }, price);
   },
   trackPaymentSuccess: (userId: string, orderId: string, amount: number, planId: string, planName: string) => {
+    trackEvent('payment_success', 'subscription_funnel', { userId, orderId, amount, planId, planName }, amount);
     trackEvent('purchase', 'ecommerce', { userId, orderId, amount, planId, planName }, amount);
+  },
+  trackPaymentStarted: (planId: string, planName: string, amount: number) => {
+    trackEvent('payment_started', 'subscription_funnel', { planId, planName, amount }, amount);
+  },
+  trackPaymentFailed: (planId: string, reason?: string) => {
+    trackEvent('payment_failed', 'subscription_funnel', { planId, reason });
+  },
+  trackSubscriptionView: () => {
+    trackEvent('subscription_view', 'subscription_funnel', {});
+  },
+  trackPlanSelected: (planId: string, planName: string) => {
+    trackEvent('plan_selected', 'subscription_funnel', { planId, planName });
   },
   trackSubscriptionActivated: (userId: string, subscriptionId: string, planName: string, amount: number) => {
     trackEvent('subscription_activated', 'subscription', { userId, subscriptionId, planName, amount }, amount);

@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "../../contexts/auth-context"
+import { canSeeNavItem } from "../../lib/route-access"
 import {
   LayoutDashboard,
   Users,
@@ -56,10 +57,17 @@ const navItems: NavItem[] = [
     href: "/"
   },
   {
-    title: "Customers",
+    title: "CRM",
     icon: Users,
     subItems: [
-      { title: "All Customers", href: "/customers" },
+      { title: "All Customers", href: "/crm" },
+      { title: "New Leads", href: "/crm/leads" },
+      { title: "Active Customers", href: "/crm/active" },
+      { title: "At Risk", href: "/crm/at-risk" },
+      { title: "Expiring", href: "/crm/expiring" },
+      { title: "Churned", href: "/crm/churned" },
+      { title: "VIP Customers", href: "/crm/vip" },
+      { title: "Command Center", href: "/crm-command" },
       { title: "Health Assessments", href: "/customers/health" },
       { title: "Delivery Addresses", href: "/customers/addresses" },
       { title: "Wallet", href: "/customers/wallet" },
@@ -72,18 +80,28 @@ const navItems: NavItem[] = [
     title: "Subscriptions",
     icon: CreditCard,
     subItems: [
+      { title: "Active", href: "/subscriptions?status=Active" },
+      { title: "Pending", href: "/subscriptions?status=Pending" },
+      { title: "Paused", href: "/subscriptions?status=Paused" },
+      { title: "Expiring", href: "/subscriptions/expiring" },
+      { title: "Expired", href: "/subscriptions?status=Expired" },
+      { title: "Cancelled", href: "/subscriptions?status=Cancelled" },
+      { title: "Renewals Due", href: "/crm/renewals" },
       { title: "Subscription Plans", href: "/plans" },
-      { title: "Active Subscriptions", href: "/subscriptions" },
-      { title: "Renewals", href: "/subscriptions/renewals" },
-      { title: "Expiring Soon", href: "/subscriptions/expiring" },
     ]
   },
   {
     title: "Orders",
     icon: ClipboardList,
     subItems: [
-      { title: "Dashboard", href: "/orders" },
       { title: "All Orders", href: "/orders/list" },
+      { title: "New", href: "/orders/pending" },
+      { title: "Preparing", href: "/orders/preparing" },
+      { title: "Ready", href: "/orders/packed" },
+      { title: "Out for Delivery", href: "/orders/out" },
+      { title: "Delivered", href: "/orders/delivered" },
+      { title: "Cancelled", href: "/orders/cancelled" },
+      { title: "Dashboard", href: "/orders" },
       { title: "Order Generation", href: "/orders/generate" },
       { title: "Reports", href: "/orders/reports" },
     ]
@@ -167,9 +185,21 @@ const navItems: NavItem[] = [
     href: "/cms"
   },
   {
+    title: "Customer Support",
+    icon: LifeBuoy,
+    subItems: [
+      { title: "Tickets", href: "/support" },
+      { title: "Complaints", href: "/complaints" },
+    ]
+  },
+  {
     title: "Reports & Analytics",
     icon: PieChart,
-    href: "/analytics"
+    subItems: [
+      { title: "Analytics", href: "/analytics" },
+      { title: "Funnel", href: "/funnel" },
+      { title: "Retention", href: "/retention" },
+    ]
   },
   {
     title: "Advanced Reports",
@@ -185,12 +215,8 @@ const navItems: NavItem[] = [
       { title: "Templates", href: "/communication/templates" },
       { title: "Conversations", href: "/communication/conversations" },
       { title: "Notifications", href: "/communication/notifications" },
+      { title: "Architecture", href: "/communication/architecture" },
     ]
-  },
-  {
-    title: "Customer Support",
-    icon: LifeBuoy,
-    href: "/support"
   },
   {
     title: "Business Settings",
@@ -380,12 +406,19 @@ export const Sidebar = React.memo(function Sidebar({ className, isOpen, setIsOpe
   }, [setIsOpen]);
 
   const filteredNavItems = useMemo(() => {
-    const roleFiltered = navItems.filter((item) => {
-      if (item.href === "/super-admin") {
-        return user?.role === "Super Admin";
-      }
-      return true;
-    });
+    const roleFiltered = navItems
+      .map((item) => ({
+        ...item,
+        subItems: item.subItems?.filter((sub) => canSeeNavItem(user?.role, sub.href)),
+      }))
+      .filter((item) => {
+        if (item.href === "/super-admin") {
+          return user?.role === "Super Admin";
+        }
+        if (item.href && !canSeeNavItem(user?.role, item.href)) return false;
+        if (item.subItems && item.subItems.length === 0 && !item.href) return false;
+        return true;
+      });
 
     if (!searchQuery) return roleFiltered;
     const query = searchQuery.toLowerCase();

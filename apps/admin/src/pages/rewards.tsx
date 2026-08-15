@@ -146,6 +146,17 @@ export default function RewardsPage({ embedded = false }: { embedded?: boolean }
   )
 
   const totalPoints = customers.reduce((sum, c) => sum + (c.rewardPoints || 0), 0)
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const issuedToday = globalRewardTxns
+    .filter((t) => String(t.type || t.actionType || "").toLowerCase().includes("earn") && String(t.createdAt || "").startsWith(todayKey))
+    .reduce((s, t) => s + Math.abs(Number(t.points || t.delta || 0)), 0)
+  const redeemedToday = globalRewardTxns
+    .filter((t) => String(t.type || t.actionType || "").toLowerCase().includes("redeem") && String(t.createdAt || "").startsWith(todayKey))
+    .reduce((s, t) => s + Math.abs(Number(t.points || t.delta || 0)), 0)
+  const pointsIssued = globalRewardTxns
+    .filter((t) => !String(t.type || "").toLowerCase().includes("redeem"))
+    .reduce((s, t) => s + Math.abs(Number(t.points || t.delta || 0)), 0) || totalPoints
+  const activeReferrals = customers.reduce((s, c) => s + (Number(c.referralsCount) || 0), 0)
 
   const filteredGlobalRewardTxns = globalRewardTxns.filter(txn => {
     const customerName = getCustomerName(txn.customerId).toLowerCase()
@@ -209,10 +220,10 @@ export default function RewardsPage({ embedded = false }: { embedded?: boolean }
           </CardHeader>
           <CardContent className="relative z-10">
             <div className="text-2xl md:text-3xl font-bold text-foreground">
-              {loading ? "-" : totalPoints.toLocaleString()}
+              {loading ? "-" : (pointsIssued || totalPoints).toLocaleString()}
             </div>
-            <p className="text-xs text-emerald-400 mt-1 flex items-center">
-              <TrendingUp className="h-3 w-3 mr-1" /> +12% this month
+            <p className="text-xs text-muted-foreground mt-1 flex items-center">
+              Outstanding balance {totalPoints.toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -226,7 +237,7 @@ export default function RewardsPage({ embedded = false }: { embedded?: boolean }
           </CardHeader>
           <CardContent className="relative z-10">
             <div className="text-2xl md:text-3xl font-bold text-foreground">
-              {loading ? "-" : Math.floor(Math.random() * 5000 + 1000).toLocaleString()}
+              {loading ? "-" : issuedToday.toLocaleString()}
             </div>
             <p className="text-xs text-amber-400 mt-1 flex items-center">
               <ArrowUpRight className="h-3 w-3 mr-1" /> Active earning
@@ -243,7 +254,7 @@ export default function RewardsPage({ embedded = false }: { embedded?: boolean }
           </CardHeader>
           <CardContent className="relative z-10">
             <div className="text-2xl md:text-3xl font-bold text-foreground">
-              {loading ? "-" : Math.floor(Math.random() * 2000 + 500).toLocaleString()}
+              {loading ? "-" : redeemedToday.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1 flex items-center">
               <ArrowDownRight className="h-3 w-3 mr-1 text-orange-400" /> Healthy burn rate
@@ -256,14 +267,14 @@ export default function RewardsPage({ embedded = false }: { embedded?: boolean }
             <Coins className="h-10 w-10 text-rose-500/20" />
           </div>
           <CardHeader className="pb-2 relative z-10">
-            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Expiring Soon</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active referrals</CardTitle>
           </CardHeader>
           <CardContent className="relative z-10">
-            <div className="text-2xl md:text-3xl font-bold text-rose-400">
-              {loading ? "-" : Math.floor(Math.random() * 10000 + 5000).toLocaleString()}
+            <div className="text-2xl md:text-3xl font-bold text-foreground">
+              {loading ? "-" : activeReferrals.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1 flex items-center">
-              Next 30 days
+              From customer records
             </p>
           </CardContent>
         </Card>

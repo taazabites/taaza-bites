@@ -14,6 +14,8 @@ import {
 import { db, auth } from '../lib/firebase';
 import { Payment, Refund, Invoice } from '../types';
 import axios from 'axios';
+import { writeAuditLog } from "../lib/audit-log";
+import { canChangePaymentStatus } from "../lib/rbac";
 
 // Toggle for UI Stabilization phase
 
@@ -80,7 +82,7 @@ export const paymentsService = {
         ...doc.data()
       })) as Payment[];
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, path);
+      console.error('Failed to list payments:', error);
       return [];
     }
   },
@@ -222,10 +224,13 @@ export const paymentsService = {
   /**
    * Update dynamic payment status (e.g. Pending -> Success) and run workflows
    */
-  async updatePaymentStatus(id: string, status: Payment['status']): Promise<void> {
+  async updatePaymentStatus(id: string, status: Payment['status'], actor?: { id?: string; name?: string; role?: string }): Promise<void> {
     
     const path = `payments/${id}`;
     try {
+      if (actor?.role && !canChangePaymentStatus(actor.role)) {
+        throw new Error('You are not permitted to change payment status. This action is audited.');
+      }
       const paymentRef = doc(db, 'payments', id);
       const paymentSnap = await getDoc(paymentRef);
       if (!paymentSnap.exists()) throw new Error('Payment not found');
@@ -234,6 +239,15 @@ export const paymentsService = {
       await updateDoc(paymentRef, {
         status,
         updatedAt: new Date().toISOString()
+      });
+      await writeAuditLog({
+        adminId: actor?.id,
+        adminName: actor?.name,
+        action: 'UPDATE',
+        entityType: 'payment',
+        entityId: id,
+        previousValue: { status: payment.status },
+        newValue: { status },
       });
 
       // Trigger workflows if transitioned to Success
@@ -469,7 +483,7 @@ export const paymentsService = {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Refund[];
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, path);
+      console.error('Failed to list refunds:', error);
       return [];
     }
   },

@@ -26,13 +26,16 @@ import { BottomSheet } from "../ui/BottomSheet";
 import { useToast } from "../../context/ToastContext";
 import { triggerHaptic } from "../../utils/haptics";
 import { SubscriptionService } from "../../firebase/services";
+import { SubscriptionActions } from "../../firebase/subscription-actions";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { format } from "date-fns";
 
 const AiNutritionModal = lazy(() => import("./AiNutritionModal"));
 const AchievementsModal = lazy(() => import("./AchievementsModal"));
 
 interface HealthHubProps {
   user: any;
-  healthScore: number;
+healthScore?: number;
   nutrition: {
     calories: { consumed: number; target: number };
     protein: { consumed: number; target: number };
@@ -99,6 +102,9 @@ export default function HealthHubLayout({
 
   // Local Subscription Pause state
   const [isSubPaused, setIsSubPaused] = useState<boolean>(subscription?.status === 'paused');
+  const [confirmSkip, setConfirmSkip] = useState(false);
+  const [skipLoading, setSkipLoading] = useState(false);
+  const [skipError, setSkipError] = useState<string | null>(null);
 
   // Meal Rating State
   const [ratingMeal, setRatingMeal] = useState<number>(0);
@@ -185,21 +191,41 @@ export default function HealthHubLayout({
   };
 
   const handleSkipTomorrowMeal = () => {
-    triggerHaptic('medium');
-    showToast("Tomorrow's meal skipped! ₹280 credited to your Taaza Wallet. 💳", "success");
+    if (!subscription?.id) {
+      showToast("No active subscription to skip.", "error");
+      return;
+    }
+    setSkipError(null);
+    setConfirmSkip(true);
+  };
+
+  const confirmSkipTomorrow = async () => {
+    if (!subscription?.id || !user?.uid) return;
+    setSkipLoading(true);
+    try {
+      const dateStr = format(new Date(Date.now() + 86400000), 'yyyy-MM-dd');
+      await SubscriptionActions.skipDay(user.uid, subscription.id, dateStr);
+      setConfirmSkip(false);
+      showToast("Tomorrow’s meals were skipped. Those meal credits stay on your plan.", "success");
+      onDataRefresh?.();
+    } catch (err: any) {
+      setSkipError(err.message || "Could not skip tomorrow. Please retry.");
+    } finally {
+      setSkipLoading(false);
+    }
   };
 
   const handleSwapDishSelect = (dishName: string) => {
     triggerHaptic('medium');
     setShowSwapModal(false);
-    showToast(`Dish swapped for ${swapDay}: ${dishName}! 🥗`, "success");
+    showToast(`Swap requested for ${swapDay}: ${dishName}. We'll confirm in your meals calendar.`, "success");
   };
 
   const handleRatingSubmit = () => {
     if (ratingMeal === 0) return;
     triggerHaptic('success');
     setRatingSubmitted(true);
-    showToast(`Thank you! Rated ${ratingMeal} Stars. +25 Taaza Coins added! ⭐`, "success");
+    showToast("Thanks for the rating.", "success");
   };
 
   const achievements = [
@@ -233,12 +259,12 @@ export default function HealthHubLayout({
         <CurrentPlanSnapshotCard
           subscription={{
             ...subscription,
-            status: isSubPaused ? 'paused' : 'active',
-            daysRemaining: subscription?.daysRemaining ?? 24,
-            totalMeals: subscription?.totalMeals ?? 30,
-            mealCredits: subscription?.mealCredits ?? 18,
-            deliveryTime: subscription?.deliveryTime || subscription?.deliveryTiming || "Lunch (12:00 PM - 1:30 PM)",
-            planName: subscription?.planName || "Executive High-Protein Plan"
+            status: isSubPaused ? 'paused' : subscription?.status,
+            daysRemaining: subscription?.daysRemaining,
+            totalMeals: subscription?.totalMeals || subscription?.planSnapshot?.totalMeals,
+            mealCredits: subscription?.mealsRemaining ?? subscription?.remainingMeals,
+            deliveryTime: subscription?.deliveryTime || subscription?.deliveryTiming,
+            planName: subscription?.planSnapshot?.planName || subscription?.planName
           }}
           onManagePreferences={() => {
             triggerHaptic('light');
@@ -830,6 +856,16 @@ export default function HealthHubLayout({
           onClose={() => setShowAchievements(false)} 
         />
       </Suspense>
+      <ConfirmDialog
+        open={confirmSkip}
+        title="Skip tomorrow?"
+        description="Tomorrow’s scheduled meals will be marked skipped and those credits stay on your subscription. This updates Firestore."
+        confirmLabel="Skip tomorrow"
+        loading={skipLoading}
+        error={skipError}
+        onConfirm={confirmSkipTomorrow}
+        onClose={() => setConfirmSkip(false)}
+      />
     </div>
   );
 }

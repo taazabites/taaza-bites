@@ -5,15 +5,23 @@ import { Referral } from "../types"
 const COLLECTION_NAME = "referrals"
 
 export const referralService = {
-  getReferrals: (callback: (data: Referral[]) => void) => {
+  getReferrals: (callback: (data: Referral[]) => void, onError?: (error: Error) => void) => {
     const q = query(collection(db, COLLECTION_NAME), orderBy("createdAt", "desc"));
-    return onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Referral[];
-      callback(data);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Referral[];
+        callback(data);
+      },
+      (error) => {
+        console.error("Error subscribing to referrals:", error);
+        callback([]);
+        onError?.(error);
+      }
+    );
   },
 
   addReferral: async (referralData: Omit<Referral, 'id' | 'createdAt'>) => {

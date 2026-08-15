@@ -85,6 +85,12 @@ export interface Customer {
   referralsCount?: number;
   referralCode?: string;
   referredByCode?: string;
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
+  riskScore?: number;
+  riskReasons?: string[];
+  crmSegment?: string;
+  calculatedAt?: string;
+  lastActivityAt?: string;
 }
 
 export interface Subscription {
@@ -238,6 +244,8 @@ export interface DeliveryPartner {
   emergencyContact?: string;
   status: 'Active' | 'Inactive' | 'Deactivated';
   availability: 'Available' | 'Busy' | 'Offline';
+  currentStatus?: string;
+  serviceAreas?: string[];
   rating: number;
   completedDeliveries: number;
   assignedOrders: number;
@@ -273,7 +281,7 @@ export interface Delivery {
   deliverySlot: string;
   driverId: string;
   driverName: string;
-  status: 'Pending' | 'Assigned' | 'Picked Up' | 'Out For Delivery' | 'Delivered' | 'Failed' | 'Returned' | 'Cancelled';
+  status: 'Pending' | 'Assigned' | 'Picked Up' | 'Out For Delivery' | 'Delivered' | 'Failed' | 'Returned' | 'Cancelled' | 'Accepted' | 'Arrived' | string;
   estimatedArrival: string;
   proofImage?: string;
   notes?: string;

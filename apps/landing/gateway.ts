@@ -9,6 +9,8 @@ const DELIVERY_UPSTREAM = process.env.DELIVERY_UPSTREAM || "http://127.0.0.1:300
 const ADMIN_API_PREFIXES = [
   "/api/me",
   "/api/super-admin",
+  "/api/partner",
+  "/api/delivery",
   "/api/auth",
   "/api/webhooks",
   "/api/razorpay",

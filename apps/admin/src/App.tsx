@@ -89,6 +89,14 @@ const PerformancePage = lazyWithRetry(() => import("./pages/performance"))
 const QATestPage = lazyWithRetry(() => import("./pages/qa-test"))
 const AIDashboardPage = lazyWithRetry(() => import("./pages/ai-dashboard"))
 const CrmCommandCenterPage = lazyWithRetry(() => import("./pages/crm-command-center"))
+const CrmCustomersPage = lazyWithRetry(() => import("./pages/crm-customers"))
+const Customer360Page = lazyWithRetry(() => import("./pages/customer-360"))
+const CrmRenewalsPage = lazyWithRetry(() => import("./pages/crm-renewals"))
+const ComplaintsPage = lazyWithRetry(() => import("./pages/complaints"))
+const MealsMappingPage = lazyWithRetry(() => import("./pages/meals-mapping"))
+const RetentionPage = lazyWithRetry(() => import("./pages/retention"))
+const FunnelPage = lazyWithRetry(() => import("./pages/funnel"))
+const NotificationArchitecturePage = lazyWithRetry(() => import("./pages/notification-architecture"))
 const UnauthorizedPage = lazyWithRetry(() => import("./pages/unauthorized"))
 const NotFoundPage = lazyWithRetry(() => import("./pages/not-found"))
 
@@ -156,9 +164,24 @@ export default function App() {
                 
                 <Route path="/orders" element={<ErrorBoundary><OrdersDashboardPage /></ErrorBoundary>} />
                 <Route path="/orders/list" element={<ErrorBoundary><OrdersListPage /></ErrorBoundary>} />
+                <Route path="/orders/pending" element={<ErrorBoundary><OrdersListPage /></ErrorBoundary>} />
+                <Route path="/orders/preparing" element={<ErrorBoundary><OrdersListPage /></ErrorBoundary>} />
+                <Route path="/orders/packed" element={<ErrorBoundary><OrdersListPage /></ErrorBoundary>} />
+                <Route path="/orders/out" element={<ErrorBoundary><OrdersListPage /></ErrorBoundary>} />
+                <Route path="/orders/delivered" element={<ErrorBoundary><OrdersListPage /></ErrorBoundary>} />
+                <Route path="/orders/cancelled" element={<ErrorBoundary><OrdersListPage /></ErrorBoundary>} />
                 <Route path="/orders/generate" element={<ErrorBoundary><OrdersGeneratePage /></ErrorBoundary>} />
                 <Route path="/orders/reports" element={<ErrorBoundary><OrdersReportsPage /></ErrorBoundary>} />
                 
+                <Route path="/crm/customers/:customerId" element={<ErrorBoundary><Customer360Page /></ErrorBoundary>} />
+                <Route path="/crm/renewals" element={<ErrorBoundary><CrmRenewalsPage /></ErrorBoundary>} />
+                <Route path="/crm" element={<ErrorBoundary><CrmCustomersPage /></ErrorBoundary>} />
+                <Route path="/crm/:segment" element={<ErrorBoundary><CrmCustomersPage /></ErrorBoundary>} />
+                <Route path="/complaints" element={<ErrorBoundary><ComplaintsPage /></ErrorBoundary>} />
+                <Route path="/meals/mapping" element={<ErrorBoundary><MealsMappingPage /></ErrorBoundary>} />
+                <Route path="/retention" element={<ErrorBoundary><RetentionPage /></ErrorBoundary>} />
+                <Route path="/funnel" element={<ErrorBoundary><FunnelPage /></ErrorBoundary>} />
+                <Route path="/communication/architecture" element={<ErrorBoundary><NotificationArchitecturePage /></ErrorBoundary>} />
                 <Route path="/customers" element={<ErrorBoundary><CustomersPage /></ErrorBoundary>} />
                 <Route path="/customers/:tab" element={<ErrorBoundary><CustomersPage /></ErrorBoundary>} />
                 

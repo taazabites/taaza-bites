@@ -54,11 +54,11 @@ service cloud.firestore {
     }
 
     function isCRMExecutive() {
-      return isOperationsManager() || hasAnyRole(['CRM Executive']);
+      return isOperationsManager() || hasAnyRole(['CRM Executive', 'CRM Manager']);
     }
 
     function isSupportExecutive() {
-      return isOperationsManager() || hasAnyRole(['Support Executive']);
+      return isOperationsManager() || hasAnyRole(['Support Executive', 'Support Staff']);
     }
 
     function isInventoryManager() {
@@ -89,6 +89,11 @@ service cloud.firestore {
     match /systemSettings/{docId} {
       allow read: if isSignedIn();
       allow write: if isSuperAdmin();
+    }
+
+    match /referrals/{referralId} {
+      allow read: if isAdmin() || isCRMExecutive() || isMarketingManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isCRMExecutive() || isMarketingManager();
     }
 
     match /customerAccountMaps/{mapId} {
@@ -209,6 +214,14 @@ service cloud.firestore {
     }
     match /payments/{paymentId} {
       allow read: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || isFinanceManager() || isAnalyticsViewer());
+      allow write: if isAdmin() || isFinanceManager();
+    }
+    match /expenses/{expenseId} {
+      allow read: if isAdmin() || isFinanceManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isFinanceManager();
+    }
+    match /wallets/{walletId} {
+      allow read: if isSignedIn() && (isAdmin() || isFinanceManager() || isAnalyticsViewer() || resource.data.customerId == request.auth.uid);
       allow write: if isAdmin() || isFinanceManager();
     }
     match /refunds/{refundId} {
@@ -370,6 +383,35 @@ service cloud.firestore {
     match /branchManagers/{managerId} {
       allow read: if isSignedIn();
       allow write: if isAdmin() || isOperationsManager();
+    }
+
+    match /healthAssessments/{id} {
+      allow read: if isSuperAdmin() || isAdmin() || hasAnyRole(['CRM Manager', 'CRM Executive', 'Nutritionist']);
+      allow write: if isSuperAdmin() || isAdmin() || hasAnyRole(['CRM Manager', 'Nutritionist']);
+    }
+    match /complaints/{id} {
+      allow read: if isAdmin() || isOperationsManager() || isCRMExecutive() || isSupportExecutive() || isAnalyticsViewer();
+      allow write: if isAdmin() || isOperationsManager() || isCRMExecutive() || isSupportExecutive();
+    }
+    match /deliveryIssues/{id} {
+      allow read: if isAdmin() || isOperationsManager() || isDeliveryManager() || isCRMExecutive() || isAnalyticsViewer();
+      allow write: if isAdmin() || isOperationsManager() || isDeliveryManager();
+    }
+    match /deliveryEarnings/{id} {
+      allow read: if isAdmin() || isOperationsManager() || isDeliveryManager() || isFinanceManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isFinanceManager();
+    }
+    match /deliveryEvents/{id} {
+      allow read: if isAdmin() || isOperationsManager() || isDeliveryManager() || isAnalyticsViewer();
+      allow write: if isAdmin() || isOperationsManager() || isDeliveryManager();
+    }
+    match /planMealMaps/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isKitchenManager();
+    }
+    match /notificationQueue/{id} {
+      allow read: if isAdmin() || isMarketingManager() || isCRMExecutive() || isSupportExecutive();
+      allow write: if isAdmin() || isMarketingManager() || isCRMExecutive() || isSupportExecutive();
     }
 
     // 23. AI Predictions

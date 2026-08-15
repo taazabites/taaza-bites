@@ -12,12 +12,17 @@ import { Button } from '../components/ui/primitives';
 import { useAuth } from '../context/AuthContext';
 import BrandLogo from '../components/common/BrandLogo';
 import { GoogleLocationInput } from '../components/location/GoogleLocationInput';
-import { SubscriptionService, HealthService } from '../firebase/services';
+import { HealthAssessmentService } from '../firebase/services';
+import { nutritionForProfile, normalizeGoal, whyThisPlan, recommendPlan } from '../lib/plan-recommendation';
+import { normalizePlan } from '../lib/plan-normalize';
+import { useSubscriptionPlans } from '../lib/plans-cache';
+import { trackFunnel } from '../lib/funnel-analytics';
 import confetti from 'canvas-confetti';
 import { useDebouncedCallback } from '../hooks/useDebouncedCallback';
 import { useThrottledCallback } from '../hooks/useThrottledCallback';
 
 interface OnboardingData {
+  fullName: string;
   goals: string[];
   age: string;
   gender: string;
@@ -27,10 +32,13 @@ interface OnboardingData {
   workSchedule: string;
   sleepPattern: string;
   exerciseFrequency: string;
+  dietPreference: 'Vegetarian' | 'Non-Vegetarian' | '';
   foodPreferences: string[];
   allergies: string[];
+  medicalConditions: string[];
   deliveryArea: string;
   mealTimes: string[];
+  mealsPerDay: number;
   deliverySlot: string;
 }
 
@@ -68,22 +76,27 @@ export default function HealthAssessmentPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisText, setAnalysisText] = useState('Analyzing your profile...');
   
+  const { plans: rawPlans } = useSubscriptionPlans();
   const [data, setData] = useState<OnboardingData>({
-    goals: [],
-    age: '25',
-    gender: 'male',
-    height: '170',
-    weight: '65',
-    activityLevel: 'Active',
-    workSchedule: 'Regular',
-    sleepPattern: '7-8 Hours',
-    exerciseFrequency: '3-4 times/week',
-    foodPreferences: ['Vegetarian', 'Chicken'],
-    allergies: ['None'],
-    deliveryArea: '',
-    mealTimes: ['Lunch'],
-    deliverySlot: 'Morning (7 AM - 9 AM)',
-  });
+  fullName: '',
+  goals: [],
+  age: '25',
+  gender: 'male',
+  height: '170',
+  weight: '65',
+  activityLevel: 'Active',
+  workSchedule: 'Regular',
+  sleepPattern: '7-8 Hours',
+  exerciseFrequency: '3-4 times/week',
+  dietPreference: '',
+  foodPreferences: [],
+  allergies: ['None'],
+  medicalConditions: ['None'],
+  deliveryArea: '',
+  mealTimes: ['Lunch'],
+  mealsPerDay: 1,
+  deliverySlot: 'Morning (7 AM - 9 AM)',
+});
 
   const updateData = (fields: Partial<OnboardingData>) => {
     setData(prev => ({ ...prev, ...fields }));
@@ -94,6 +107,9 @@ export default function HealthAssessmentPage() {
   }, 50);
 
   const nextStep = () => {
+    if (step === 0) {
+      trackFunnel('health_assessment_started');
+    }
     if (step === 6) {
       setDirection(1);
       setStep(7);
@@ -134,56 +150,64 @@ export default function HealthAssessmentPage() {
 
   const canProceed = () => {
     switch(step) {
-      case 1: return data.goals.length > 0;
-      case 2: return !!(data.age && data.gender && data.height && data.weight);
+      case 1: return data.goals.length === 1;
+      case 2: return !!(data.fullName.trim() && data.age && data.gender && data.height && data.weight);
       case 3: return !!(data.activityLevel && data.workSchedule && data.sleepPattern && data.exerciseFrequency);
-      case 4: return data.foodPreferences.length > 0;
-      case 5: return data.allergies.length > 0;
+      case 4: return !!data.dietPreference;
+      case 5: return data.allergies.length > 0 && data.medicalConditions.length > 0;
       case 6: return !!(data.deliveryArea && data.mealTimes.length > 0 && data.deliverySlot);
       default: return true;
     }
   };
 
-  const selectPlan = (planId: string) => {
-    const weightNum = Number(data.weight) || 70;
-    const calories = data.goals.includes('weight-loss') ? 1650 : (data.goals.includes('muscle-gain') ? 2450 : 2000);
-    const protein = Math.round(weightNum * 1.8);
+  const selectPlan = async () => {
+    const macros = nutritionForProfile({
+      gender: data.gender,
+      age: data.age,
+      height: data.height,
+      weight: data.weight,
+      activityLevel: data.activityLevel,
+      goal: data.goals,
+    });
+    const goal = normalizeGoal(data.goals);
+    const mealsPerDay = data.mealTimes.includes('All Meals') ? 3 : data.mealTimes.length;
+    const livePlans = (rawPlans || []).map(normalizePlan).filter(p => p.active);
+    const recommended = recommendPlan(livePlans, { mealsPerDay, goal, calories: macros.recommendedCalories });
 
-    const mealsCount = data.mealTimes.length || 1;
-    const duration = planId === 'trial-week' ? 3 : 30;
-    const rawPrice = 300 * mealsCount * duration;
-    const discountMultiplier = duration === 30 ? 0.85 : 1.00;
-    const price = Math.round(rawPrice * discountMultiplier);
-    const originalPrice = rawPrice;
-
-    const selectedPlanData = {
-        id: planId === 'trial-week' ? 'trial_3' : 'plan_30',
-        name: planId === 'trial-week' ? '3-Day Intro Trial' : '30-Day Monthly Plan',
-        durationDays: duration,
-        price: originalPrice,
-        offerPrice: price,
-        savings: originalPrice - price,
-        mealsPerDay: mealsCount,
-        totalMeals: duration * mealsCount,
-        calories: calories,
-        protein: protein,
-        deliveryTiming: data.deliverySlot || 'Morning',
-    };
-    
-    localStorage.setItem('taaza_selected_plan', JSON.stringify(selectedPlanData));
-    localStorage.setItem('taaza_health_profile', JSON.stringify(data));
+    trackFunnel('health_assessment_completed', { goal, mealsPerDay });
 
     if (currentUser) {
-      HealthService.saveAssessment(currentUser.uid, {
-        ...data,
-        ...selectedPlanData,
-        calculatedCalories: calories,
-        calculatedProtein: protein
-      }).catch(err => console.warn("Failed to persist health assessment:", err));
-      
-      navigate('/checkout');
+      try {
+        await HealthAssessmentService.saveAssessment(currentUser.uid, '', {
+          fullName: data.fullName,
+          phone: currentUser.phoneNumber || '',
+          age: Number(data.age),
+          gender: data.gender,
+          height: Number(data.height),
+          weight: Number(data.weight),
+          goal,
+          dietPreference: data.dietPreference,
+          mealPreference: data.mealTimes,
+          mealsPerDay,
+          preferredDeliveryTime: data.deliverySlot,
+          activityLevel: data.activityLevel,
+          allergies: data.allergies,
+          medicalConditions: data.medicalConditions,
+          wakeUpTime: '',
+          sleepTime: data.sleepPattern,
+          waterIntake: macros.recommendedWater,
+          targetWeight: Number(data.weight),
+          recommendedCalories: macros.recommendedCalories,
+          recommendedProtein: macros.recommendedProtein,
+          calculatedCalories: macros.recommendedCalories,
+          calculatedProtein: macros.recommendedProtein,
+        } as any);
+      } catch (err) {
+        console.warn('Failed to persist health assessment:', err);
+      }
+      navigate(`/plans?from=assessment${recommended ? `&recommended=${recommended.id}` : ''}`);
     } else {
-      navigate('/login', { state: { from: { pathname: '/checkout' } } });
+      navigate('/login', { state: { from: { pathname: '/plans', search: '?from=assessment' } } });
     }
   };
 
@@ -233,17 +257,17 @@ export default function HealthAssessmentPage() {
 
   const renderGoals = () => {
     const goalsList = [
-      { id: 'weight-loss', label: 'Weight Loss', sub: 'Burn fat effectively', icon: TrendingDown, color: 'bg-rose-50 text-rose-600' },
-      { id: 'muscle-gain', label: 'Muscle Gain', sub: 'Build strength with protein', icon: Zap, color: 'bg-amber-50 text-amber-600' },
-      { id: 'healthy-lifestyle', label: 'Healthy Life', sub: 'Better energy & longevity', icon: HeartPulse, color: 'bg-emerald-50 text-emerald-600' },
-      { id: 'high-protein', label: 'High Protein', sub: 'Fuel your active workouts', icon: Target, color: 'bg-sky-50 text-sky-600' }
+      { id: 'weight-loss', label: 'Weight Loss', sub: 'Sustainable calorie-aware meals', icon: TrendingDown, color: 'bg-rose-50 text-rose-600' },
+      { id: 'muscle-gain', label: 'Muscle Gain', sub: 'Higher protein daily meals', icon: Zap, color: 'bg-amber-50 text-amber-600' },
+      { id: 'healthy-lifestyle', label: 'Healthy Lifestyle', sub: 'Balanced energy for everyday life', icon: HeartPulse, color: 'bg-emerald-50 text-emerald-600' },
+      { id: 'maintenance', label: 'Maintenance', sub: 'Stay at your current weight', icon: Target, color: 'bg-sky-50 text-sky-600' }
     ];
     
     return (
       <div className="flex flex-col h-full space-y-6">
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-bold text-zinc-900">What's your goal?</h2>
-          <p className="text-zinc-500 font-medium text-sm">Select one or more targets for your plan.</p>
+          <p className="text-zinc-500 font-medium text-sm">Select the goal that matters most right now.</p>
         </div>
         
         <div className="grid grid-cols-1 gap-3">
@@ -254,13 +278,7 @@ export default function HealthAssessmentPage() {
               <motion.div 
                 key={g.id}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  if (isSelected) {
-                    updateData({ goals: data.goals.filter(id => id !== g.id) });
-                  } else {
-                    updateData({ goals: [...data.goals, g.id] });
-                  }
-                }}
+                onClick={() => updateData({ goals: [g.id] })}
                 className={cn(
                   "flex items-center gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all",
                   isSelected 
@@ -297,6 +315,16 @@ export default function HealthAssessmentPage() {
         </div>
 
         <div className="space-y-6">
+          <label className="block">
+            <span className="font-bold text-zinc-900 text-sm">Your name</span>
+            <input
+              value={data.fullName}
+              onChange={e => updateData({ fullName: e.target.value })}
+              placeholder="As you’d like us to greet you"
+              className="mt-2 w-full h-12 rounded-2xl border-2 border-zinc-100 px-4 font-medium"
+            />
+          </label>
+
           <div className="grid grid-cols-2 gap-3">
             {[
               { id: 'male', label: 'Male', icon: '👨' },
@@ -439,44 +467,33 @@ export default function HealthAssessmentPage() {
   };
 
   const renderFoodPreferences = () => {
-    const preferences = [
-      { name: 'Vegetarian', emoji: '🥦' },
-      { name: 'Vegan', emoji: '🌱' },
-      { name: 'Eggetarian', emoji: '🥚' },
-      { name: 'Chicken', emoji: '🍗' },
-      { name: 'Fish', emoji: '🐟' },
-      { name: 'Paneer', emoji: '🧀' },
-      { name: 'Tofu', emoji: '🧊' }
+    const diets = [
+      { name: 'Vegetarian', emoji: '🥦', id: 'Vegetarian' as const },
+      { name: 'Non-Vegetarian', emoji: '🍗', id: 'Non-Vegetarian' as const },
     ];
 
     return (
       <div className="flex flex-col h-full space-y-8">
         <div className="text-center space-y-2">
-          <h2 className="text-3xl font-bold text-zinc-900">Your preferences</h2>
-          <p className="text-zinc-500 font-medium text-sm">Tell us your protein choices.</p>
+          <h2 className="text-3xl font-bold text-zinc-900">Meal preference</h2>
+          <p className="text-zinc-500 font-medium text-sm">Choose one diet style. You can fine-tune meals later.</p>
         </div>
         
-        <div className="flex flex-wrap gap-3 justify-center">
-          {preferences.map(pref => {
-            const isSelected = data.foodPreferences.includes(pref.name);
+        <div className="grid grid-cols-1 gap-3">
+          {diets.map(pref => {
+            const isSelected = data.dietPreference === pref.id;
             return (
               <button 
-                key={pref.name}
-                onClick={() => {
-                  if (isSelected) {
-                    updateData({ foodPreferences: data.foodPreferences.filter(p => p !== pref.name) });
-                  } else {
-                    updateData({ foodPreferences: [...data.foodPreferences, pref.name] });
-                  }
-                }}
+                key={pref.id}
+                onClick={() => updateData({ dietPreference: pref.id, foodPreferences: [pref.id] })}
                 className={cn(
-                  "px-6 py-4 rounded-2xl border-2 font-bold text-sm flex items-center gap-2 transition-all",
+                  "px-6 py-5 rounded-2xl border-2 font-bold text-sm flex items-center gap-3 transition-all",
                   isSelected 
                     ? "border-emerald-600 bg-emerald-600 text-white shadow-lg" 
                     : "border-zinc-100 bg-white text-zinc-700 hover:border-zinc-200"
                 )}
               >
-                <span>{pref.emoji}</span>
+                <span className="text-2xl">{pref.emoji}</span>
                 <span>{pref.name}</span>
               </button>
             );
@@ -536,16 +553,51 @@ export default function HealthAssessmentPage() {
             );
           })}
         </div>
+
+        <div className="space-y-3 pt-2">
+          <h3 className="text-base font-bold text-zinc-900">Medical conditions</h3>
+          <p className="text-xs text-zinc-500">Helps us avoid unsuitable dishes. This is not medical advice.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {['None', 'Diabetes', 'Hypertension', 'Thyroid', 'PCOS', 'Other'].map(item => {
+              const isSelected = data.medicalConditions.includes(item);
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    if (item === 'None') {
+                      updateData({ medicalConditions: ['None'] });
+                    } else {
+                      const filtered = data.medicalConditions.filter(a => a !== 'None');
+                      if (isSelected) {
+                        const after = filtered.filter(a => a !== item);
+                        updateData({ medicalConditions: after.length ? after : ['None'] });
+                      } else {
+                        updateData({ medicalConditions: [...filtered, item] });
+                      }
+                    }
+                  }}
+                  className={cn(
+                    "p-4 rounded-2xl border-2 font-bold text-sm",
+                    isSelected ? "border-emerald-600 bg-emerald-50 text-emerald-900" : "border-zinc-100 text-zinc-500"
+                  )}
+                >
+                  {item}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     );
   };
 
   const renderDelivery = () => {
     const mealList = [
-      { id: 'Breakfast', label: '🥞 Breakfast', desc: 'Energy to start your day' },
-      { id: 'Lunch', label: '🍱 Healthy Lunch', desc: 'Fuel for afternoon focus' },
-      { id: 'Snacks', label: '🍪 Healthy Snacks', desc: 'Midday energy boost' },
-      { id: 'Dinner', label: '🍛 Light Dinner', desc: 'Clean evening recovery' }
+      { id: 'Breakfast', label: 'Breakfast', desc: 'Morning meal' },
+      { id: 'Lunch', label: 'Lunch', desc: 'Midday meal' },
+      { id: 'Dinner', label: 'Dinner', desc: 'Evening meal' },
+      { id: 'All Meals', label: 'All Meals', desc: 'Breakfast, lunch and dinner' }
     ];
 
     const slots = [
@@ -580,12 +632,17 @@ export default function HealthAssessmentPage() {
                   <button 
                     key={ml.id}
                     onClick={() => {
+                      if (ml.id === 'All Meals') {
+                        updateData({ mealTimes: ['All Meals'], mealsPerDay: 3 });
+                        return;
+                      }
+                      const withoutAll = data.mealTimes.filter(m => m !== 'All Meals');
                       if (isSelected) {
-                        if (data.mealTimes.length > 1) {
-                          updateData({ mealTimes: data.mealTimes.filter(m => m !== ml.id) });
-                        }
+                        const next = withoutAll.filter(m => m !== ml.id);
+                        updateData({ mealTimes: next.length ? next : [ml.id], mealsPerDay: Math.max(1, next.length) });
                       } else {
-                        updateData({ mealTimes: [...data.mealTimes, ml.id] });
+                        const next = [...withoutAll, ml.id];
+                        updateData({ mealTimes: next, mealsPerDay: next.length });
                       }
                     }}
                     className={cn(
@@ -649,97 +706,59 @@ export default function HealthAssessmentPage() {
   );
 
   const renderResults = () => {
-    const weightNum = Number(data.weight) || 70;
-    const heightNum = Number(data.height) || 170;
-    const bmi = (weightNum / Math.pow(heightNum / 100, 2)).toFixed(1);
-    
-    const isWeightLoss = data.goals.includes('weight-loss');
-    const isMuscleGain = data.goals.includes('muscle-gain');
-    
-    const calories = isWeightLoss ? 1650 : (isMuscleGain ? 2450 : 2000);
-    const protein = Math.round(weightNum * 1.8);
-
-    const mealsCount = data.mealTimes.length || 1;
-
-    const monthlyPrice = Math.round(300 * mealsCount * 30 * 0.85);
-    const originalPrice = 300 * mealsCount * 30;
-    const trialPrice = 300 * mealsCount * 3;
+    const macros = nutritionForProfile({
+      gender: data.gender,
+      age: data.age,
+      height: data.height,
+      weight: data.weight,
+      activityLevel: data.activityLevel,
+      goal: data.goals,
+    });
+    const goal = normalizeGoal(data.goals);
+    const mealsPerDay = data.mealTimes.includes('All Meals') ? 3 : data.mealTimes.length;
+    const livePlans = (rawPlans || []).map(normalizePlan).filter(p => p.active);
+    const recommended = recommendPlan(livePlans, { mealsPerDay, goal, calories: macros.recommendedCalories });
 
     return (
       <div className="flex flex-col min-h-screen bg-white text-zinc-900 pb-32">
-         <div className="bg-emerald-600 text-white rounded-b-[2.5rem] sm:rounded-b-[3rem] px-6 sm:px-8 pt-12 sm:pt-16 pb-12 sm:pb-12 text-center space-y-4 sm:space-y-6">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="inline-flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full text-[10px] sm:text-xs font-bold"
-            >
-              <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-300" /> Assessment Complete
-            </motion.div>
-            
+         <div className="bg-emerald-600 text-white rounded-b-[2.5rem] px-6 pt-12 pb-12 text-center space-y-4">
             <h2 className="text-3xl sm:text-4xl font-bold leading-tight tracking-tight">
-              Your Personalized <br className="hidden sm:block" /> Nutrition Plan
+              Your Personalized Plan
             </h2>
-            
-            <p className="text-emerald-50 text-[13px] sm:text-sm font-medium leading-relaxed max-w-[280px] sm:max-w-xs mx-auto opacity-90">
-              Based on your profile, we've designed a plan with <span className="font-bold">{protein}g protein</span> and <span className="font-bold">{calories} Kcal</span> per day.
+            <p className="text-emerald-50 text-sm font-medium max-w-sm mx-auto">
+              General nutrition estimate for a {goal.toLowerCase()} focus. Not medical advice.
             </p>
          </div>
 
-         <div className="max-w-md mx-auto px-5 sm:px-6 -mt-6 sm:-mt-8 space-y-6 sm:space-y-8 w-full">
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+         <div className="max-w-md mx-auto px-5 -mt-6 space-y-6 w-full">
+            <div className="grid grid-cols-2 gap-2">
                {[
-                 { label: 'Calories', val: calories, unit: 'kcal', icon: <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" /> },
-                 { label: 'Protein', val: protein, unit: 'g', icon: <Dumbbell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" /> },
-                 { label: 'BMI', val: bmi, unit: '', icon: <HeartPulse className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" /> }
-               ].map((m, i) => (
-                 <div key={i} className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 text-center shadow-lg border border-zinc-100/50">
-                    <div className="flex justify-center mb-1">{m.icon}</div>
-                    <p className="text-lg sm:text-xl font-bold text-zinc-900 tracking-tight">{m.val}{m.unit}</p>
-                    <p className="text-[9px] sm:text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">{m.label}</p>
+                 { label: 'Goal', val: goal },
+                 { label: 'Calories / day', val: `${macros.recommendedCalories}` },
+                 { label: 'Protein / day', val: `${macros.recommendedProtein}g` },
+                 { label: 'Meals / day', val: `${mealsPerDay}` },
+               ].map((m) => (
+                 <div key={m.label} className="bg-white rounded-2xl p-4 text-center shadow-lg border border-zinc-100">
+                    <p className="text-lg font-bold text-zinc-900">{m.val}</p>
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">{m.label}</p>
                  </div>
                ))}
             </div>
 
-            <div className="space-y-4">
-               <h3 className="text-base sm:text-lg font-bold text-zinc-900 px-1">Choose your start</h3>
-               
-               <div 
-                 onClick={() => selectPlan('monthly-core')}
-                 className="bg-zinc-900 text-white rounded-[2rem] p-5 sm:p-6 relative cursor-pointer hover:scale-[1.02] transition-all shadow-xl active:scale-[0.98]"
-               >
-                  <div className="absolute top-4 right-4 px-2.5 py-1 bg-emerald-500 text-white rounded-full text-[9px] font-black uppercase tracking-wider">
-                     BEST VALUE
-                  </div>
-                  
-                  <div className="space-y-4">
-                     <div>
-                        <h4 className="text-lg sm:text-xl font-bold">30-Day Monthly Plan</h4>
-                        <p className="text-[11px] text-zinc-400">Scientifically paced results</p>
-                     </div>
-                     
-                     <div className="flex justify-between items-end">
-                        <div>
-                          <p className="text-2xl sm:text-3xl font-bold">₹{monthlyPrice.toLocaleString()}</p>
-                          <p className="text-[10px] text-zinc-500 line-through">₹{originalPrice.toLocaleString()}</p>
-                        </div>
-                        <Button className="rounded-xl sm:rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-black h-9 sm:h-10 px-5 sm:px-6 text-[10px] uppercase tracking-widest">
-                           Select
-                        </Button>
-                     </div>
-                  </div>
-               </div>
+            {recommended ? (
+              <div className="rounded-[2rem] bg-zinc-900 text-white p-6 space-y-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Recommended subscription</p>
+                <h4 className="text-xl font-bold">{recommended.planName}</h4>
+                <p className="text-sm text-zinc-300 leading-relaxed">{whyThisPlan(recommended, goal, macros.recommendedCalories, macros.recommendedProtein)}</p>
+                <p className="text-2xl font-black">₹{recommended.offerPrice.toLocaleString()}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500 text-center">We’ll show live plans next. Availability depends on your area and current menu.</p>
+            )}
 
-               <div 
-                 onClick={() => selectPlan('trial-week')}
-                 className="bg-white rounded-[2rem] p-5 sm:p-6 border-2 border-zinc-100 cursor-pointer hover:border-emerald-200 transition-all flex justify-between items-center shadow-sm active:scale-[0.98]"
-               >
-                  <div>
-                     <h4 className="text-base sm:text-lg font-bold">3-Day Intro Trial</h4>
-                     <p className="text-[11px] text-zinc-400">Taste the experience</p>
-                  </div>
-                  <p className="text-lg sm:text-xl font-bold text-zinc-900">₹{trialPrice.toLocaleString()}</p>
-               </div>
-            </div>
+            <Button onClick={() => selectPlan()} className="w-full h-14 rounded-2xl bg-emerald-600 text-white font-bold">
+              View subscription plans
+            </Button>
          </div>
       </div>
     );

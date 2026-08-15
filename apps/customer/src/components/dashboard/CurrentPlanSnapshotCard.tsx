@@ -37,12 +37,12 @@ export function CurrentPlanSnapshotCard({
   const navigate = useNavigate();
 
   // Smart defaults if subscription object is partial or missing
-  const planName = subscription?.planName || "Executive High-Protein Plan";
-  const status = subscription?.status || "active";
+  const planName = subscription?.planName;
+  const status = subscription?.status;
   const isPaused = status === "paused";
   
-  const totalMeals = subscription?.totalMeals ?? 24;
-  const remainingCredits = subscription?.mealCredits ?? subscription?.daysRemaining ?? 18;
+  const totalMeals = subscription?.totalMeals ?? 0;
+  const remainingCredits = subscription?.mealCredits ?? subscription?.daysRemaining ?? 0;
   const creditPercentage = Math.min(100, Math.max(0, Math.round((remainingCredits / totalMeals) * 100)));
 
   // Calculate days left in billing cycle
@@ -55,12 +55,12 @@ export function CurrentPlanSnapshotCard({
       const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
       return Math.max(0, diffDays);
     }
-    return 14; // Default fallback billing cycle days left
+    return 0;
   };
 
   const daysLeftInCycle = computeDaysLeft();
-  const deliverySlot = subscription?.deliveryTime || subscription?.deliveryTiming || "Lunch (12:00 PM - 1:30 PM)";
-  const dietaryTag = subscription?.dietaryPreference || "High-Protein • Low-Carb";
+  const deliverySlot = subscription?.deliveryTime || subscription?.deliveryTiming || "—";
+  const dietaryTag = subscription?.dietaryPreference || "";
 
   const handleManageClick = () => {
     triggerHaptic('light');

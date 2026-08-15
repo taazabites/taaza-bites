@@ -440,14 +440,19 @@ export const downloadCSV = (data: any[], filename: string) => {
 };
 
 // 9. Delivery Tab performance helper
-export const getDriverPerformance = () => {
-  return [
-    { name: "Rahul Sharma", vehicle: "Ather 450X (Electric)", completed: 142, rating: 4.9, status: "Active" },
-    { name: "Amit Patel", vehicle: "TVS iQube (Electric)", completed: 118, rating: 4.8, status: "Active" },
-    { name: "Suresh Kumar", vehicle: "Bajaj Chetak EV", completed: 95, rating: 4.6, status: "Active" },
-    { name: "Vikram Singh", vehicle: "Ola S1 Pro (Electric)", completed: 88, rating: 4.7, status: "Active" },
-    { name: "Deepak Verma", vehicle: "Hero Vida V1", completed: 74, rating: 4.5, status: "Active" }
-  ];
+export const getDriverPerformance = (partners: DeliveryPartner[] = [], deliveries: Delivery[] = []) => {
+  if (!partners.length) return [];
+  return partners.map((p) => {
+    const mine = deliveries.filter((d) => d.driverId === p.id || d.driverId === p.partnerId);
+    const completed = mine.filter((d) => String(d.status).toLowerCase().includes('deliver')).length;
+    return {
+      name: p.fullName,
+      vehicle: [p.vehicleType, p.vehicleNumber].filter(Boolean).join(' ') || '—',
+      completed,
+      rating: typeof p.rating === 'number' && p.rating > 0 ? p.rating : 0,
+      status: p.currentStatus || p.status,
+    };
+  });
 };
 
 // 10. Payment Tab gateway status helper

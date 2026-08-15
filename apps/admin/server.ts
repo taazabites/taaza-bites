@@ -11,6 +11,8 @@ import superAdminRoutes from './src/server/routes/super-admin';
 import gupshupWebhookRoutes from './src/server/routes/webhooks/gupshup';
 import razorpayWebhookRoutes from './src/server/routes/webhooks/razorpay';
 import { authenticate, authorize } from './src/server/middleware/auth-middleware';
+import partnerApiRoutes from './src/server/routes/partner-api';
+import deliveryOpsRoutes from './src/server/routes/delivery-ops';
 import firebaseConfig from "./firebase-applet-config.json";
 
 
@@ -118,6 +120,8 @@ async function startServer() {
   app.use('/api/auth', authRoutes);
   app.use(meRoutes);
   app.use('/api/super-admin', superAdminRoutes);
+  app.use('/api/partner', partnerApiRoutes);
+  app.use('/api/delivery', deliveryOpsRoutes);
   app.use('/api/webhooks/gupshup', gupshupWebhookRoutes);
   app.use('/api/razorpay/webhook', razorpayWebhookRoutes);
   
@@ -908,6 +912,33 @@ async function startServer() {
       res.json(response.data);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch distance" });
+    }
+  });
+
+  app.post("/api/coupons/validate", async (req, res) => {
+    try {
+      const { code, customerId, amount, planId } = req.body || {};
+      const { db } = getFirebaseAdmin();
+      if (!db) return res.status(503).json({ valid: false, error: "Database unavailable" });
+      if (!code) return res.status(400).json({ valid: false, error: "Coupon code required" });
+      const snap = await db.collection("coupons").where("couponCode", "==", String(code).toUpperCase()).limit(1).get();
+      const alt = snap.empty ? await db.collection("coupons").where("code", "==", String(code).toUpperCase()).limit(1).get() : snap;
+      if (alt.empty) return res.status(404).json({ valid: false, error: "Coupon not found" });
+      const coupon = alt.docs[0].data();
+      const now = Date.now();
+      const start = coupon.startDate ? new Date(coupon.startDate).getTime() : 0;
+      const end = coupon.endDate ? new Date(coupon.endDate).getTime() : now + 1;
+      if (coupon.active === false) return res.status(400).json({ valid: false, error: "Coupon inactive" });
+      if (now < start || now > end) return res.status(400).json({ valid: false, error: "Coupon not in date window" });
+      const min = Number(coupon.minimumAmount || 0);
+      if (amount && Number(amount) < min) return res.status(400).json({ valid: false, error: "Minimum amount not met" });
+      const plans = coupon.applicablePlans || [];
+      if (planId && plans.length && !plans.includes(planId)) {
+        return res.status(400).json({ valid: false, error: "Not applicable to this plan" });
+      }
+      return res.json({ valid: true, coupon: { id: alt.docs[0].id, ...coupon } });
+    } catch (error: any) {
+      res.status(500).json({ valid: false, error: error.message });
     }
   });
 

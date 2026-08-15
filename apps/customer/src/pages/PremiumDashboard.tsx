@@ -7,6 +7,8 @@ import DashboardLayout from "../components/dashboard/DashboardLayout";
 import HealthHubLayout from "../components/dashboard/HealthHubLayout";
 import { PageTransition } from "../components/dashboard/PageTransition";
 import PullToRefresh from "../components/common/PullToRefresh";
+import { SubscriptionHomeCards } from "../components/dashboard/SubscriptionHomeCards";
+import { DeliveryService } from "../firebase/services";
 import { 
   UserService, 
   SubscriptionService, 
@@ -45,6 +47,7 @@ export default function HealthHub() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [rewardPoints, setRewardPoints] = useState<RewardPoints | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
+  const [delivery, setDelivery] = useState<any>(null);
   
   useEffect(() => {
     if (currentUser) {
@@ -69,14 +72,15 @@ export default function HealthHub() {
         return;
       }
       
-      const [subRes, healthRes, progressRes, weekRes, walletRes, rewardsRes, addressRes] = await Promise.allSettled([
+      const [subRes, healthRes, progressRes, weekRes, walletRes, rewardsRes, addressRes, deliveryRes] = await Promise.allSettled([
         SubscriptionService.getActiveSubscription(currentUser.uid),
         HealthAssessmentService.getAssessments(currentUser.uid),
         HealthProgressService.getProgressLogs(currentUser.uid),
         MealService.getWeeklySchedule(currentUser.uid, new Date()),
         WalletService.getWallet(currentUser.uid),
         RewardService.getRewardPoints(currentUser.uid),
-        AddressService.getAddresses(currentUser.uid)
+        AddressService.getAddresses(currentUser.uid),
+        DeliveryService.getDeliveries(currentUser.uid)
       ]);
       
       clearTimeout(timeout);
@@ -111,6 +115,10 @@ export default function HealthHub() {
       if (addressRes.status === 'fulfilled' && Array.isArray(addressRes.value)) {
         setAddresses(addressRes.value);
       }
+
+      if (deliveryRes.status === 'fulfilled' && Array.isArray(deliveryRes.value) && deliveryRes.value.length > 0) {
+        setDelivery(deliveryRes.value.find((d: any) => !['delivered', 'Delivered'].includes(String(d.deliveryStatus))) || deliveryRes.value[0]);
+      }
       
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -135,34 +143,43 @@ export default function HealthHub() {
     );
   }
 
-  // Calculate stats
-  const healthScore = (healthProfile as any)?.score || 88;
   const currentCalories = todayMeals.reduce((sum, m) => sum + ((m as any).nutrition?.calories || 0), 0);
   const currentProtein = todayMeals.reduce((sum, m) => sum + ((m as any).nutrition?.protein || 0), 0);
-  const targetCalories = healthProfile?.recommendedCalories || 2200;
-  const targetProtein = healthProfile?.recommendedProtein || 140;
-
-  // Hydration fallback
-  const waterConsumed = parseInt(localStorage.getItem(`water_consumed_${new Date().toISOString().split('T')[0]}`) || '1850', 10);
-  const targetWater = healthProfile?.recommendedWater || 3000;
+  const targetCalories = healthProfile?.recommendedCalories || healthProfile?.calculatedCalories;
+  const targetProtein = healthProfile?.recommendedProtein || healthProfile?.calculatedProtein;
+  const targetWater = healthProfile?.recommendedWater;
+  const waterConsumed = Number((healthProgress as any)?.waterIntake || 0);
+  const customerName = (userData as any)?.displayName || (userData as any)?.name || (healthProfile as any)?.fullName || currentUser?.displayName || '';
+  const defaultAddr = addresses.find((a) => a.default) || addresses[0];
+  const weightCurrent = healthProfile?.weight;
+  const weightTarget = healthProfile?.targetWeight;
 
   return (
     <DashboardLayout>
       <PullToRefresh onRefresh={handleRefresh}>
         <PageTransition>
           <div className="max-w-6xl mx-auto space-y-6">
+            <SubscriptionHomeCards
+              customerName={customerName}
+              subscription={subscription}
+              todayMeals={todayMeals}
+              address={subscription?.deliveryAddress || defaultAddr}
+              delivery={delivery || todayMeals[0]}
+              streak={(healthProgress as any)?.streak || 0}
+              onRenew={() => navigate(`/plans?mode=renew&subscriptionId=${subscription?.id || ''}`)}
+            />
             <HealthHubLayout 
               user={userData || currentUser}
-              healthScore={healthScore}
+              healthScore={(healthProfile as any)?.score}
               nutrition={{
-                calories: { consumed: currentCalories, target: targetCalories },
-                protein: { consumed: currentProtein, target: targetProtein },
-                water: { consumed: waterConsumed, target: targetWater }
+                calories: { consumed: currentCalories, target: targetCalories || 0 },
+                protein: { consumed: currentProtein, target: targetProtein || 0 },
+                water: { consumed: waterConsumed, target: targetWater || 0 }
               }}
               weightGoal={{
-                current: 74.2,
-                target: 70,
-                label: healthProfile?.goal || "Metabolic Optimization"
+                current: weightCurrent || 0,
+                target: weightTarget || 0,
+                label: healthProfile?.goal || "Your goal"
               }}
               todayMeal={todayMeals[0]}
               weeklyMeals={weeklyMeals}
@@ -171,9 +188,9 @@ export default function HealthHub() {
               rewardPoints={rewardPoints}
               addresses={addresses}
               deliveryStatus={{
-                 status: todayMeals[0]?.deliveryStatus || 'preparing',
-                 eta: (todayMeals[0] as any)?.deliverySlot || "08:15 AM",
-                 driver: { name: "Arjun", phone: "+91 98765 43210" }
+                 status: delivery?.deliveryStatus || todayMeals[0]?.deliveryStatus,
+                 eta: todayMeals[0]?.deliveryTime || delivery?.eta,
+                 driver: delivery?.partnerName ? { name: delivery.partnerName, phone: delivery.partnerPhone } : undefined
               }}
               onDataRefresh={loadDashboardData}
             />

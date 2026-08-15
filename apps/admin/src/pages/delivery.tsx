@@ -139,7 +139,8 @@ export default function DeliveryPage() {
     joiningDate: new Date().toISOString().substring(0, 10),
     emergencyContact: "",
     status: "Active" as 'Active' | 'Inactive' | 'Deactivated',
-    availability: "Available" as 'Available' | 'Busy' | 'Offline'
+    availability: "Available" as 'Available' | 'Busy' | 'Offline',
+    serviceAreas: "",
   })
 
   // Form states - Routes
@@ -416,7 +417,8 @@ export default function DeliveryPage() {
       joiningDate: new Date().toISOString().substring(0, 10),
       emergencyContact: "",
       status: "Active",
-      availability: "Available"
+      availability: "Available",
+      serviceAreas: "",
     })
     setShowAddPartner(true)
   }
@@ -429,7 +431,14 @@ export default function DeliveryPage() {
     }
     try {
       setLoading(true)
-      await deliveryService.addPartner(partnerForm, user.id, user.email)
+      await deliveryService.addPartner(
+        {
+          ...partnerForm,
+          serviceAreas: partnerForm.serviceAreas.split(",").map((s) => s.trim()).filter(Boolean),
+        } as Omit<DeliveryPartner, "id" | "completedDeliveries" | "assignedOrders" | "rating" | "createdAt" | "updatedAt">,
+        user.id,
+        user.email
+      )
       setShowAddPartner(false)
     } catch (err: any) {
       toast.error("Failed to add partner: " + err.message)
@@ -452,7 +461,8 @@ export default function DeliveryPage() {
       joiningDate: p.joiningDate || new Date().toISOString().substring(0, 10),
       emergencyContact: p.emergencyContact || "",
       status: p.status || "Active",
-      availability: p.availability || "Available"
+      availability: p.availability || "Available",
+      serviceAreas: (p.serviceAreas || []).join(", "),
     })
   }
 
@@ -460,7 +470,15 @@ export default function DeliveryPage() {
     if (!editingPartner || !user) return
     try {
       setLoading(true)
-      await deliveryService.updatePartner(editingPartner.id, partnerForm, user.id, user.email)
+      await deliveryService.updatePartner(
+        editingPartner.id,
+        {
+          ...partnerForm,
+          serviceAreas: partnerForm.serviceAreas.split(",").map((s) => s.trim()).filter(Boolean),
+        },
+        user.id,
+        user.email
+      )
       setEditingPartner(null)
     } catch (err: any) {
       toast.error("Failed to update partner: " + err.message)
@@ -1952,6 +1970,15 @@ export default function DeliveryPage() {
                     className="bg-zinc-900 border-zinc-800 text-white"
                   />
                 </div>
+                <div>
+                  <label className="text-xs text-zinc-400 block mb-1">Service areas (comma separated)</label>
+                  <Input
+                    value={partnerForm.serviceAreas}
+                    onChange={(e) => setPartnerForm({ ...partnerForm, serviceAreas: e.target.value })}
+                    className="bg-zinc-900 border-zinc-800 text-white"
+                    placeholder="HSR, Koramangala"
+                  />
+                </div>
               </div>
               
               <div className="border-t border-zinc-900 pt-4 flex justify-end gap-2">
@@ -2055,6 +2082,14 @@ export default function DeliveryPage() {
                   />
                 </div>
                 <div>
+                  <label className="text-xs text-zinc-400 block mb-1">Service areas</label>
+                  <Input
+                    value={partnerForm.serviceAreas}
+                    onChange={(e) => setPartnerForm({ ...partnerForm, serviceAreas: e.target.value })}
+                    className="bg-zinc-900 border-zinc-800 text-white"
+                  />
+                </div>
+                <div>
                   <label className="text-xs text-zinc-400 block mb-1">Status</label>
                   <select
                     value={partnerForm.status}
@@ -2149,14 +2184,27 @@ export default function DeliveryPage() {
                   <span className="text-zinc-300">{viewingPartner.emergencyContact || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-zinc-500">Completed Handoffs:</span>
-                  <span className="text-emerald-400 font-bold">{viewingPartner.completedDeliveries} boxes</span>
+                  <span className="text-zinc-500">Live status:</span>
+                  <span className="text-zinc-300">{viewingPartner.currentStatus || viewingPartner.availability}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Service areas:</span>
+                  <span className="text-zinc-300">{(viewingPartner.serviceAreas || []).join(", ") || "—"}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Failed / returned today:</span>
+                  <span className="text-zinc-300">
+                    {deliveries.filter((d) =>
+                      (d.driverId === viewingPartner.id || d.driverId === viewingPartner.partnerId) &&
+                      (d.status === "Failed" || d.status === "Returned")
+                    ).length}
+                  </span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-zinc-500">Rating:</span>
                   <span className="text-amber-400 font-bold flex items-center gap-1">
                     <Star className="h-3.5 w-3.5 fill-amber-400" />
-                    {viewingPartner.rating}
+                    {viewingPartner.rating > 0 ? viewingPartner.rating : 'No ratings yet'}
                   </span>
                 </div>
               </div>

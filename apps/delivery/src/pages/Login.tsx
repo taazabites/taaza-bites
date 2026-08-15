@@ -2,14 +2,12 @@ import React, { useState, useEffect } from "react";
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { Phone, ShieldCheck, ArrowRight } from "lucide-react";
-
+import { ShieldCheck, ArrowRight } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { DEMO_PARTNER } from "@/lib/demo-credentials";
 
 export default function Login() {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -17,7 +15,7 @@ export default function Login() {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const { user, profile, loading: authLoading, accessDeniedReason, allowDemoLogin, loginDemo } = useAuth();
+  const { user, profile, loading: authLoading, accessDeniedReason } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -34,37 +32,21 @@ export default function Login() {
     }
   }, []);
 
-  const handleDemoLogin = async () => {
-    setLoading(true);
-    try {
-      await loginDemo();
-      navigate("/", { replace: true });
-    } catch (error: any) {
-      toast.error(error.message || "Demo login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneNumber || phoneNumber.length < 10) {
       toast.error("Please enter a valid phone number");
       return;
     }
-    
     setLoading(true);
     const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`;
-    
     try {
-      const appVerifier = window.recaptchaVerifier;
-      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
       setConfirmationResult(confirmation);
       setStep("otp");
-      toast.success("OTP sent successfully");
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Failed to send OTP");
+      toast.success("OTP sent");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to send OTP");
     } finally {
       setLoading(false);
     }
@@ -73,18 +55,15 @@ export default function Login() {
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otp || otp.length < 6 || !confirmationResult) {
-      toast.error("Please enter a valid OTP");
+      toast.error("Enter the 6-digit OTP");
       return;
     }
-
     setLoading(true);
     try {
       await confirmationResult.confirm(otp);
-      // AuthContext will verify partner doc; navigate only when profile exists
-      toast.success("OTP verified — checking partner access…");
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Invalid OTP");
+      toast.success("Checking partner access…");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Invalid OTP");
     } finally {
       setLoading(false);
     }
@@ -98,9 +77,7 @@ export default function Login() {
             <ShieldCheck className="size-8 text-primary" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Partner Portal</h1>
-          <p className="mt-2 text-sm text-zinc-500">
-            Sign in to access your deliveries and earnings
-          </p>
+          <p className="mt-2 text-sm text-zinc-500">Sign in with your registered mobile number</p>
           {accessDeniedReason && (
             <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs text-amber-800">
               {accessDeniedReason}
@@ -119,42 +96,19 @@ export default function Login() {
                 <Input
                   id="phone"
                   type="tel"
-                  placeholder="Enter 10 digit number"
-                  className="pl-12"
+                  inputMode="numeric"
+                  placeholder="10 digit number"
+                  className="pl-12 h-12 text-base"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   disabled={loading}
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
               {loading ? "Sending OTP..." : "Get OTP"}
               {!loading && <ArrowRight className="ml-2 size-4" />}
             </Button>
-
-            {allowDemoLogin && (
-              <div className="space-y-2 pt-2">
-                <div className="relative flex items-center py-1">
-                  <div className="flex-grow border-t border-border" />
-                  <span className="mx-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                    Demo
-                  </span>
-                  <div className="flex-grow border-t border-border" />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  disabled={loading}
-                  onClick={handleDemoLogin}
-                >
-                  Enter as Demo Partner
-                </Button>
-                <p className="text-center text-[10px] text-zinc-500">
-                  Phone preview: +91 {DEMO_PARTNER.phone}
-                </p>
-              </div>
-            )}
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-6">
@@ -163,18 +117,22 @@ export default function Login() {
               <Input
                 id="otp"
                 type="text"
+                inputMode="numeric"
                 placeholder="000000"
-                className="text-center tracking-widest text-lg"
+                className="h-12 text-center tracking-[0.4em] text-lg"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 disabled={loading}
                 autoFocus
               />
               <p className="text-xs text-zinc-500 text-center">
-                OTP sent to {phoneNumber} <button type="button" onClick={() => setStep("phone")} className="text-primary underline">Edit</button>
+                OTP sent to {phoneNumber}{" "}
+                <button type="button" onClick={() => setStep("phone")} className="text-primary underline">
+                  Edit
+                </button>
               </p>
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
               {loading ? "Verifying..." : "Verify & Login"}
             </Button>
           </form>

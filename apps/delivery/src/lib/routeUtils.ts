@@ -1,4 +1,6 @@
-import { DeliveryAssignment, SlotTimingStatus } from "@/types";
+import { DeliveryStop } from "@/types";
+
+export type SlotTimingStatus = "on_time" | "running_late" | "delayed";
 
 const SLOT_WINDOWS: Record<string, { start: number; end: number }> = {
   breakfast: { start: 7, end: 9 },
@@ -52,11 +54,11 @@ export function distanceKm(
  * Optionally opens Google Directions multi-stop URL.
  */
 export function optimizeRouteOrder(
-  deliveries: DeliveryAssignment[],
+  deliveries: DeliveryStop[],
   kitchen: { lat: number; lng: number } = { lat: 12.9121, lng: 77.6446 }
-): DeliveryAssignment[] {
+): DeliveryStop[] {
   const remaining = [...deliveries];
-  const ordered: DeliveryAssignment[] = [];
+  const ordered: DeliveryStop[] = [];
   let cursor = kitchen;
 
   while (remaining.length) {
@@ -66,7 +68,8 @@ export function optimizeRouteOrder(
       if (d.isPriority) {
         // prefer priority among near-equal; still distance-first overall
       }
-      const dist = distanceKm(cursor, d.location) - (d.isPriority ? 0.5 : 0);
+      const pin = d.location || kitchen;
+      const dist = distanceKm(cursor, pin) - (d.isPriority ? 0.5 : 0);
       if (dist < bestDist) {
         bestDist = dist;
         bestIdx = i;
@@ -74,13 +77,13 @@ export function optimizeRouteOrder(
     });
     const next = remaining.splice(bestIdx, 1)[0];
     ordered.push(next);
-    cursor = next.location;
+    cursor = next.location || kitchen;
   }
   return ordered.map((d, i) => ({ ...d, routeOrder: i + 1 }));
 }
 
 export function buildGoogleDirectionsUrl(
-  deliveries: DeliveryAssignment[],
+  deliveries: DeliveryStop[],
   kitchen: { lat: number; lng: number } = { lat: 12.9121, lng: 77.6446 }
 ): string {
   if (!deliveries.length) {
@@ -89,7 +92,10 @@ export function buildGoogleDirectionsUrl(
   const origin = `${kitchen.lat},${kitchen.lng}`;
   const destination = origin; // return to kitchen
   const waypoints = deliveries
-    .map((d) => `${d.location.lat},${d.location.lng}`)
+    .map((d) => {
+      const pin = d.location || kitchen;
+      return `${pin.lat},${pin.lng}`;
+    })
     .join("|");
   return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${encodeURIComponent(
     waypoints
@@ -97,15 +103,16 @@ export function buildGoogleDirectionsUrl(
 }
 
 export function estimateRouteKm(
-  deliveries: DeliveryAssignment[],
+  deliveries: DeliveryStop[],
   kitchen: { lat: number; lng: number } = { lat: 12.9121, lng: 77.6446 }
 ): number {
   if (!deliveries.length) return 0;
   let total = 0;
   let cursor = kitchen;
   for (const d of deliveries) {
-    total += distanceKm(cursor, d.location);
-    cursor = d.location;
+    const pin = d.location || kitchen;
+    total += distanceKm(cursor, pin);
+    cursor = pin;
   }
   total += distanceKm(cursor, kitchen);
   return Math.round(total * 10) / 10;

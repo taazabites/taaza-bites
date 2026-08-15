@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Loader2, RefreshCcw, Search, Edit, Activity, CalendarClock } from "lucide-react"
+import { canViewHealth } from "../lib/rbac"
+import { useAuth } from "../contexts/auth-context"
 import { customerService } from "../services/customers"
 import { Customer } from "../types"
 import { DataTableSkeleton } from "@/src/components/ui/data-table-skeleton"
@@ -20,6 +22,7 @@ import {
 } from "@/components/ui/dialog"
 
 export default function HealthPage({ embedded = false }: { embedded?: boolean }) {
+  const { user } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -113,6 +116,13 @@ export default function HealthPage({ embedded = false }: { embedded?: boolean })
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
   const paginatedCustomers = filteredCustomers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
+  if (!canViewHealth(user?.role)) {
+    return (
+      <div className="p-8 text-zinc-400 text-sm">
+        Health assessments are restricted to authorized roles (Super Admin, Admin, CRM, Nutritionist).
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">

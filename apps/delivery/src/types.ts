@@ -6,103 +6,123 @@ declare global {
   }
 }
 
-export type OrderStatus =
-  | "assigned"
-  | "accepted"
-  | "rejected"
-  | "picked_up"
-  | "out_for_delivery"
-  | "delivered"
-  | "failed"
-  | "returned";
+export type DeliveryStatus =
+  | "ASSIGNED"
+  | "ACCEPTED"
+  | "PICKED_UP"
+  | "OUT_FOR_DELIVERY"
+  | "ARRIVED"
+  | "DELIVERED"
+  | "FAILED"
+  | "CANCELLED"
+  | "RETURN_TO_KITCHEN";
 
-export type MealSlot = "Breakfast" | "Lunch" | "Dinner" | string;
+export type PartnerLiveStatus = "ONLINE" | "OFFLINE" | "ON_DELIVERY" | "SUSPENDED";
 
-export type SlotTimingStatus = "on_time" | "running_late" | "delayed";
+export type PaymentStatus = "paid" | "cod";
 
-export interface StructuredAddress {
-  type?: "Home" | "Office" | "Other";
-  flatNumber?: string;
-  building?: string;
-  floor?: string;
-  landmark?: string;
-  gateInstructions?: string;
-  securityInstructions?: string;
-}
-
-export interface DeliveryAssignment {
+export interface DeliveryStop {
   id: string;
-  orderId: string;
-  subscriptionId: string;
   partnerId: string;
+  orderId: string;
+  customerId: string;
   customerName: string;
+  customerFirstName: string;
   customerPhone: string;
-  customerAltPhone?: string;
-  customerPhotoUrl?: string;
   deliveryAddress: string;
-  addressDetails?: StructuredAddress;
+  deliveryArea: string;
   area: string;
-  pincode: string;
-  location: { lat: number; lng: number };
-  mealType: MealSlot;
-  mealItems: string[];
+  pincode?: string;
+  deliverySlot: string;
   mealName?: string;
-  isVeg?: boolean;
+  mealItems: string[];
+  packageCount: number;
   quantity: number;
-  calories: string;
-  protein: string;
-  deliveryTimeSlot: string;
-  /** e.g. "12/30" */
-  subscriptionDay?: string;
+  specialInstructions?: string;
   kitchenNotes?: string;
-  customerNotes?: string;
-  status: OrderStatus;
-  paymentStatus: "paid" | "cod";
-  deliveryOTP: string;
+  paymentStatus: PaymentStatus;
+  location?: { lat: number; lng: number } | null;
   isPriority: boolean;
   routeOrder?: number;
+  status: DeliveryStatus;
+  assignedAt?: number;
+  acceptedAt?: number;
+  pickedUpAt?: number;
+  outForDeliveryAt?: number;
+  arrivedAt?: number;
+  deliveredAt?: number;
+  failedAt?: number;
+  issueReason?: string;
+  issueNotes?: string;
+  deliveryPhotoUrl?: string;
+  verificationMethod?: "OTP" | "CONFIRMATION" | "PHOTO" | string;
+  earningsTotal?: number;
   createdAt: number;
   updatedAt: number;
-  rejectReason?: string;
-  failureReason?: string;
-  deliveryPhotoUrl?: string;
-  cantReachAttempts?: number;
 }
 
-export interface PartnerStats {
-  todayEarnings: number;
-  weeklyEarnings: number;
-  monthlyEarnings: number;
-  completedDeliveries: number;
-  pendingDeliveries: number;
-  failedDeliveries: number;
-  performanceScore: number;
-  rating: number;
-  completedKm: number;
-  workingHours: number;
-}
-
-export interface PartnerIssueReport {
-  id?: string;
+export interface PartnerProfile {
+  uid: string;
   partnerId: string;
-  partnerName?: string;
-  type:
-    | "vehicle"
-    | "accident"
-    | "food_damaged"
-    | "wrong_package"
-    | "customer_unavailable"
-    | "address_issue"
-    | "kitchen_delay"
-    | "traffic"
-    | "location_mismatch"
-    | "other";
-  message: string;
-  assignmentId?: string;
-  location?: { lat: number; lng: number };
-  createdAt: number;
-  status: "open" | "acknowledged" | "resolved";
+  name: string;
+  phone: string;
+  photo?: string;
+  photoUrl?: string;
+  active: boolean;
+  vehicleType: string;
+  vehicleNumber: string;
+  serviceAreas: string[];
+  currentStatus: PartnerLiveStatus;
+  joiningDate?: string;
+  emergencyContact?: string;
+  upiId?: string;
+  isBlocked?: boolean;
+  role?: string;
 }
 
-/** Dummy tiffin-box security deposit (customer can change later) */
-export const TIFFIN_SECURITY_DEPOSIT_INR = 299;
+export interface DeliveryEarning {
+  id: string;
+  partnerId: string;
+  deliveryId: string;
+  orderId: string;
+  baseAmount: number;
+  bonus: number;
+  adjustment: number;
+  totalAmount: number;
+  status: string;
+  createdAt: number;
+}
+
+export interface DeliveryIssue {
+  id: string;
+  deliveryId: string;
+  reason: string;
+  notes: string;
+  reportedBy: string;
+  reportedAt: number;
+  action?: string;
+}
+
+export interface PartnerNotification {
+  id: string;
+  partnerId: string;
+  type: string;
+  title: string;
+  body: string;
+  deliveryId?: string;
+  read: boolean;
+  createdAt: number;
+}
+
+export const ISSUE_REASONS = [
+  "Customer unavailable",
+  "Wrong address",
+  "Customer requested reschedule",
+  "Phone unreachable",
+  "Refused delivery",
+  "Vehicle issue",
+  "Kitchen delay",
+  "Other",
+] as const;
+
+export type IssueReason = (typeof ISSUE_REASONS)[number];

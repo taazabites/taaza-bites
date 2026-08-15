@@ -148,7 +148,7 @@ export default function QATestPage() {
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-6 max-w-7xl mx-auto space-y-8 pb-20"
+      className="max-w-7xl mx-auto space-y-8 pb-8"
     >
       {/* Dynamic Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-zinc-900 pb-8">
