@@ -1,6 +1,5 @@
 # Firebase App Hosting — landing
 # Console root directory: apps/landing
-# Docs: https://firebase.google.com/docs/app-hosting/configure
 
 runConfig:
   minInstances: 0
@@ -10,8 +9,9 @@ runConfig:
   memoryMiB: 512
 
 scripts:
-  # Windows-generated lockfiles omit Linux Rollup natives — wipe lock + reinstall on Cloud Build
-  buildCommand: rm -rf node_modules package-lock.json && npm install && npm install @rollup/rollup-linux-x64-gnu && npm run build
+  # Cloud Build runs npm ci first (needs package.json ↔ lock in sync).
+  # Then force-install Linux Rollup native (often missing from Windows lock installs).
+  buildCommand: npm install --no-save @rollup/rollup-linux-x64-gnu@4.59.0 && npm run build
   runCommand: node dist/server.cjs
 
 outputFiles:
