@@ -106,7 +106,7 @@ export default function Layout({children}: {children: ReactNode}) {
 
   if (!isDashboardPath) {
     return (
-      <div className="min-h-screen flex flex-col bg-white overflow-x-clip w-full relative">
+      <div className="min-h-screen flex flex-col bg-white dark:bg-zinc-950 overflow-x-clip w-full relative">
         <DynamicSeoHelmet />
         <Suspense fallback={null}><PublicNavbar /></Suspense>
         <AnimatePresence mode="wait">

@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { GatewayConfiguration } from "../../types/communication"
+import { adminFetch } from "@/src/lib/api"
 import { motion } from "motion/react"
 import { doc, onSnapshot } from "firebase/firestore"
 import { db } from "../../lib/firebase"
@@ -179,7 +180,7 @@ export default function GatewaySettingsPage() {
 
   const fetchConfig = async () => {
     try {
-      const response = await fetch("/api/settings/gateways")
+      const response = await adminFetch("/api/settings/gateways")
       const data = await response.json()
       setConfig(data)
       setIsDirty(false)
@@ -197,7 +198,7 @@ export default function GatewaySettingsPage() {
     setSaving(true)
     addLog("Initiating handshake to secure and encrypt gateway credentials...")
     try {
-      const response = await fetch("/api/settings/gateways", {
+      const response = await adminFetch("/api/settings/gateways", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -225,7 +226,7 @@ export default function GatewaySettingsPage() {
     setTesting(type)
     addLog(`Testing connectivity loop for ${type.toUpperCase()} gateway...`)
     try {
-      const response = await fetch(`/api/settings/test/${type}`, {
+      const response = await adminFetch(`/api/settings/test/${type}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -282,7 +283,7 @@ export default function GatewaySettingsPage() {
     setTesting('sync')
     addLog("Downloading and compiling WhatsApp messaging templates from GupShup...")
     try {
-      const response = await fetch("/api/gupshup/templates/sync")
+      const response = await adminFetch("/api/gupshup/templates/sync")
       const data = await response.json()
       if (data.success) {
         toast.success(`${data.count} templates synchronized from Gupshup`)

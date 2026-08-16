@@ -23,6 +23,7 @@ import {
  Scan
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../../firebase/db";
 
@@ -34,24 +35,14 @@ interface CommandItem {
  keywords?: string;
 }
 
-export default function CommandMenu() {
+ export default function CommandMenu() {
  const navigate = useNavigate();
  const { user, logout } = useAuth();
- 
+ const { isDark, toggleTheme } = useTheme();
  const [isOpen, setIsOpen] = useState(false);
  const [search, setSearch] = useState("");
  const debouncedSearch = useDebounce(search, 150);
  const [activeIndex, setActiveIndex] = useState(0);
- const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
-
- // Sync state with DOM on mount and updates
- useEffect(() => {
- const observer = new MutationObserver(() => {
- setIsDark(document.documentElement.classList.contains("dark"));
- });
- observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
- return () => observer.disconnect();
- }, []);
 
  // Toggle menu on Cmd+K / Ctrl+K and custom event
  useEffect(() => {
@@ -82,12 +73,7 @@ export default function CommandMenu() {
 
  const toggleDarkMode = async () => {
  const nextDark = !isDark;
- if (nextDark) {
- document.documentElement.classList.add("dark");
- } else {
- document.documentElement.classList.remove("dark");
- }
- setIsDark(nextDark);
+ toggleTheme();
  setIsOpen(false);
 
  if (user) {
@@ -160,7 +146,7 @@ export default function CommandMenu() {
  onKeyDown={handleKeyDown}
  >
  {/* Search Input */}
- <div className="flex items-center gap-3 p-4 border-b border-zinc-100 ">
+ <div className="flex items-center gap-3 p-4 border-b border-zinc-100 dark:border-zinc-800">
  <Search className="h-5 w-5 text-zinc-400 shrink-0" />
  <input
  autoFocus
@@ -169,7 +155,7 @@ export default function CommandMenu() {
  onChange={(e) => { setSearch(e.target.value); setActiveIndex(0); }}
  className="w-full bg-transparent text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none text-base tracking-tight"
  />
- <kbd className="hidden md:flex items-center gap-1 text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-1 rounded-md border border-zinc-200 ">ESC</kbd>
+ <kbd className="hidden md:flex items-center gap-1 text-[10px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700">ESC</kbd>
  </div>
 
  {/* Commands List */}
@@ -206,16 +192,16 @@ export default function CommandMenu() {
  </div>
 
  {/* Footer Hint */}
- <div className="flex items-center justify-between p-3 border-t border-zinc-100 bg-zinc-50/50 ">
+ <div className="flex items-center justify-between p-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/60">
  <div className="flex items-center gap-2 text-xs text-zinc-500">
- <kbd className="flex items-center gap-0.5 bg-white px-1.5 py-0.5 rounded border border-zinc-200 ">
+ <kbd className="flex items-center gap-0.5 bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
  <ChevronUp className="h-3 w-3" />
  <ChevronDown className="h-3 w-3" />
  </kbd>
  <span className="text-zinc-400 ">to navigate</span>
  </div>
  <div className="flex items-center gap-2 text-xs text-zinc-500">
- <kbd className="bg-white px-1.5 py-0.5 rounded border border-zinc-200 ">Enter</kbd>
+ <kbd className="bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">Enter</kbd>
  <span className="text-zinc-400 ">to select</span>
  </div>
  </div>

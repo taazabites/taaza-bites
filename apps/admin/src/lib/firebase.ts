@@ -11,8 +11,9 @@ const config = {
 
 export const app = getApps().length > 0 ? getApp() : initializeApp(config);
 export const auth = getAuth(app);
-// Fix for auth/captcha-check-failed and hostname match not found in dev environments
-auth.settings.appVerificationDisabledForTesting = true;
+if (import.meta.env.DEV) {
+  auth.settings.appVerificationDisabledForTesting = true;
+}
 export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId);
 export const firestore = db;
 export const storage = getStorage(app);

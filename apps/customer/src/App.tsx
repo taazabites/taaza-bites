@@ -10,7 +10,10 @@ import { useAuth } from './context/AuthContext';
 import { initMarketingScripts, Analytics } from './utils/analytics';
 import { APIProvider } from '@vis.gl/react-google-maps';
 
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_PLATFORM_KEY || 'YOUR_API_KEY';
+const API_KEY =
+  import.meta.env.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+  "";
 // Helper for dynamic lazy imports with automatic chunk retry on network/version mismatch
 const lazyWithRetry = <T extends ComponentType<any>>(componentImport: () => Promise<{ default: T }>) =>
   lazy(async () => {

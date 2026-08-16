@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Server, Database, Webhook, ShieldCheck, Mail, MessageSquare } from "lucide-react";
+import { adminFetch } from "@/src/lib/api";
 
 export default function OperationsDashboardPage() {
   const [health, setHealth] = useState<any>(null);
@@ -9,8 +10,8 @@ export default function OperationsDashboardPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/health').then(res => res.json()),
-      fetch('/api/settings/gateways').then(res => res.json())
+      adminFetch('/api/ops/health').then(res => res.json()),
+      adminFetch('/api/settings/gateways').then(res => res.json())
     ]).then(([healthData, gatewaysData]) => {
       setHealth(healthData);
       setGateways(gatewaysData);
@@ -35,7 +36,7 @@ export default function OperationsDashboardPage() {
               <Server className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">{health?.status === 'ok' ? 'Operational' : 'Issues Detected'}</div>
+              <div className="text-2xl font-bold text-white">{health?.status === 'ok' || health?.health === 'healthy' ? 'Operational' : 'Issues Detected'}</div>
               <p className="text-xs text-zinc-500">Uptime: Optimal</p>
             </CardContent>
           </Card>

@@ -313,7 +313,7 @@ export default function SupportHub() {
   return (
     <div className="space-y-8">
       {/* Segmented Controller (Tabs) */}
-      <div className="flex bg-zinc-100 p-1.5 rounded-[24px] max-w-xl mx-auto border border-zinc-200 shrink-0">
+      <div className="flex bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-[24px] max-w-xl mx-auto border border-zinc-200 dark:border-zinc-800 shrink-0">
         {[
           { id: "tickets", label: "Tickets Tracker" },
           { id: "chat", label: "Live Support" },
@@ -347,7 +347,7 @@ export default function SupportHub() {
           >
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <h3 className="text-xl font-black text-zinc-900 flex items-center gap-2">
+                <h3 className="text-xl font-black text-zinc-900 dark:text-white flex items-center gap-2">
                   <LifeBuoy className="h-6 w-6 text-emerald-600" />
                   Support Tickets Engine
                 </h3>
@@ -406,7 +406,7 @@ export default function SupportHub() {
                       <span>Category: {ticket.category}</span>
                       <div className="flex items-center gap-1.5 text-zinc-400 font-bold">
                         <Clock className="h-3 w-3" />
-                        <span>Update {ticket.updatedAt ? format(ticket.updatedAt.toDate(), "dd MMM") : "Today"}</span>
+                        <span>Update {ticket.updatedAt?.toDate ? format(ticket.updatedAt.toDate(), "dd MMM") : "Today"}</span>
                       </div>
                     </div>
                   </Card>

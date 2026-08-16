@@ -37,6 +37,12 @@ export default defineConfig(() => {
       },
     },
     server: {
+      proxy: {
+        '/api': {
+          target: process.env.ADMIN_UPSTREAM || 'http://127.0.0.1:3001',
+          changeOrigin: true,
+        },
+      },
       hmr:
         process.env.DISABLE_HMR === 'true'
           ? false

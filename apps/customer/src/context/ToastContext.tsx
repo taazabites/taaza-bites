@@ -42,7 +42,7 @@ export function ToastProvider({children}: {children: ReactNode}) {
               initial={{opacity: 0, y: -20, scale: 0.95}}
               animate={{opacity: 1, y: 0, scale: 1}}
               exit={{opacity: 0, scale: 0.95, y: -10}}
-              className="pointer-events-auto flex items-center justify-between p-4 rounded-xl border bg-white/95 backdrop-blur-md shadow-lg"
+              className="pointer-events-auto flex items-center justify-between p-4 rounded-xl border bg-white/95 dark:bg-zinc-900/95 dark:border-zinc-700 backdrop-blur-md shadow-lg"
               style={{
                 borderColor:
                   toast.type === 'success'
@@ -67,11 +67,11 @@ export function ToastProvider({children}: {children: ReactNode}) {
                 {toast.type === 'info' && (
                   <Info className="w-5 h-5 text-blue-500 shrink-0" />
                 )}
-                <p className="text-sm font-medium text-gray-800">{toast.message}</p>
+                <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">{toast.message}</p>
               </div>
               <button
                 onClick={() => removeToast(toast.id)}
-                className="ml-4 text-gray-400 hover:text-gray-600 focus:outline-none"
+                className="ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 focus:outline-none"
               >
                 <X className="w-4 h-4" />
               </button>

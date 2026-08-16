@@ -3,64 +3,22 @@ import path from "path";
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import axios from 'axios';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 import authRoutes from './src/server/routes/auth';
 import meRoutes from './src/server/routes/me';
 import superAdminRoutes from './src/server/routes/super-admin';
 import gupshupWebhookRoutes from './src/server/routes/webhooks/gupshup';
-import razorpayWebhookRoutes from './src/server/routes/webhooks/razorpay';
-import { authenticate, authorize } from './src/server/middleware/auth-middleware';
+import { authenticate, authenticateCron, authorize } from './src/server/middleware/auth-middleware';
 import partnerApiRoutes from './src/server/routes/partner-api';
 import deliveryOpsRoutes from './src/server/routes/delivery-ops';
-import firebaseConfig from "./firebase-applet-config.json";
+import { FIRESTORE_DB_IDS, getFirebaseAdmin, getNamedDb } from './src/server/lib/firebase-admin';
 
-
-
-// Lazy initialization helpers
-let firebaseAdminApp: any = null;
-let firestoreDb: any = null;
-
-function getFirebaseAdmin() {
-  if (firebaseAdminApp) return { app: firebaseAdminApp, db: firestoreDb };
-
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-
-  if (!projectId || !clientEmail || !privateKey) {
-    console.warn("Firebase Admin credentials missing. Firestore-dependent features will fail.");
-    return { app: null, db: null };
-  }
-
-  try {
-    // Clean private key: handle literal \n and ensure proper PEM format
-    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-      privateKey = privateKey.slice(1, -1);
-    }
-    
-    const formattedKey = privateKey.replace(/\\n/g, '\n');
-    const databaseId = firebaseConfig.firestoreDatabaseId || "ai-studio-taazabitesadmint-f2702470-dbd9-4fd8-8d80-708eb0bdb4c2";
-    
-    if (getApps().length === 0) {
-      firebaseAdminApp = initializeApp({
-        credential: cert({
-          projectId,
-          clientEmail,
-          privateKey: formattedKey,
-        })
-      });
-      firestoreDb = getFirestore(firebaseAdminApp, databaseId);
-    } else {
-      firebaseAdminApp = getApps()[0];
-      firestoreDb = getFirestore(firebaseAdminApp, databaseId);
-    }
-    return { app: firebaseAdminApp, db: firestoreDb };
-  } catch (error) {
-    console.error("Failed to initialize Firebase Admin:", error);
-    return { app: null, db: null };
-  }
-}
+const FINANCE_ROLES = ['Super Admin', 'Admin', 'Finance Manager', 'Finance'];
+const SETTINGS_ROLES = ['Super Admin', 'Admin'];
+const NOTIFY_ROLES = ['Super Admin', 'Admin', 'Operations Manager', 'Support Staff', 'CRM Manager'];
+const MAPS_ROLES = ['Super Admin', 'Admin', 'Delivery Manager', 'Operations Manager'];
+const COUPON_ROLES = ['Super Admin', 'Admin', 'Marketing Manager', 'Finance Manager'];
 
 let razorpayInstance: Razorpay | null = null;
 function getRazorpay() {
@@ -104,8 +62,8 @@ async function startServer() {
     ];
     if (!origin || allowed.some((o) => origin.startsWith(o.replace(/\/$/, '')))) {
       res.setHeader('Access-Control-Allow-Origin', origin || '*');
-      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Taaza-App, X-Cron-Secret');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     }
     if (req.method === 'OPTIONS') return res.status(204).end();
     next();
@@ -115,6 +73,15 @@ async function startServer() {
   app.get("/health", (req, res) => {
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
   });
+  app.get("/api/ops/health", authenticate, (req, res) => {
+    const { app: adminApp, db } = getFirebaseAdmin();
+    res.json({
+      status: "ok",
+      health: "healthy",
+      firebaseAdmin: Boolean(adminApp && db),
+      timestamp: new Date().toISOString(),
+    });
+  });
 
   // API routes
   app.use('/api/auth', authRoutes);
@@ -123,7 +90,6 @@ async function startServer() {
   app.use('/api/partner', partnerApiRoutes);
   app.use('/api/delivery', deliveryOpsRoutes);
   app.use('/api/webhooks/gupshup', gupshupWebhookRoutes);
-  app.use('/api/razorpay/webhook', razorpayWebhookRoutes);
   
   app.get("/api/payments/config", authenticate, authorize(['Super Admin', 'Admin', 'Finance Manager']), (req, res) => {
     res.json({
@@ -131,7 +97,7 @@ async function startServer() {
     });
   });
 
-  app.post("/api/payments/create-order", async (req, res) => {
+  app.post("/api/payments/create-order", authenticate, authorize(FINANCE_ROLES), async (req, res) => {
     try {
       const { amount, currency, receipt, notes, customerId } = req.body;
       const razorpay = getRazorpay();
@@ -174,7 +140,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/payments/verify", async (req, res) => {
+  app.post("/api/payments/verify", authenticate, authorize(FINANCE_ROLES), async (req, res) => {
     try {
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature, customerId } = req.body;
       const { db } = getFirebaseAdmin();
@@ -219,46 +185,14 @@ async function startServer() {
     }
   });
 
-  app.post("/api/payments/refund", async (req, res) => {
+  app.post("/api/payments/refund", authenticate, authorize(FINANCE_ROLES), async (req, res) => {
     try {
       const { paymentId, amount, notes, reason } = req.body;
       const razorpay = getRazorpay();
       const { db } = getFirebaseAdmin();
 
       if (!razorpay || !paymentId || paymentId.startsWith('mock') || !paymentId.startsWith('pay_')) {
-        console.warn("Razorpay not configured or mock payment. Simulating refund in database.");
-        if (db) {
-          const paymentsRef = db.collection('payments');
-          let paymentDoc = await paymentsRef.doc(paymentId).get();
-          if (!paymentDoc.exists) {
-            const snapshot = await paymentsRef.where('razorpayPaymentId', '==', paymentId).limit(1).get();
-            if (!snapshot.empty) {
-              paymentDoc = snapshot.docs[0];
-            } else {
-              paymentDoc = null;
-            }
-          }
-
-          if (paymentDoc) {
-            const paymentData = paymentDoc.data();
-            await paymentDoc.ref.update({
-              status: 'Refunded',
-              updatedAt: FieldValue.serverTimestamp()
-            });
-
-            // Add to refunds collection
-            await db.collection('refunds').add({
-              paymentId: paymentDoc.id,
-              razorpayPaymentId: paymentId,
-              razorpayRefundId: `ref_mock_${Math.floor(Math.random() * 1000000)}`,
-              amount: amount || (paymentData?.amount || 0),
-              reason: reason || 'Refund processed from admin (Simulated)',
-              status: 'Success',
-              createdAt: FieldValue.serverTimestamp()
-            });
-          }
-        }
-        return res.json({ id: `ref_mock_${Date.now()}`, amount: (amount || 0) * 100, status: 'processed' });
+        return res.status(503).json({ error: "Live Razorpay refund is unavailable for this payment." });
       }
       
       // 1. Fetch payment from Razorpay
@@ -450,46 +384,8 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  // Gupshup Webhook
-  app.post("/api/webhooks/gupshup", async (req, res) => {
-    console.log("Gupshup Webhook received:", JSON.stringify(req.body, null, 2));
-    const { db } = getFirebaseAdmin();
-    
-    try {
-      const payload = req.body;
-      const { type, payload: eventPayload } = payload;
-      
-      // Store log in Firestore
-      if (db) {
-        await db.collection("gupshupWebhooks").add({
-          type,
-          payload: eventPayload,
-          receivedAt: FieldValue.serverTimestamp()
-        });
-
-        // If it's a message status update, log it in communicationLogs
-        if (type === 'message-event') {
-          await db.collection("communicationLogs").add({
-            channel: 'whatsapp',
-            direction: 'outbound',
-            recipient: eventPayload.destination,
-            status: eventPayload.status,
-            messageId: eventPayload.id,
-            timestamp: FieldValue.serverTimestamp(),
-            provider: 'gupshup'
-          });
-        }
-      }
-
-      res.status(200).json({ status: "ok" });
-    } catch (error) {
-      console.error("Gupshup Webhook Error:", error);
-      res.status(500).json({ error: "Failed to process webhook" });
-    }
-  });
-
   // Push Notifications
-  app.post("/api/notifications/send", async (req, res) => {
+  app.post("/api/notifications/send", authenticate, authorize(NOTIFY_ROLES), async (req, res) => {
     const { token, title, body, data } = req.body;
     const { app: adminApp } = getFirebaseAdmin();
     
@@ -504,7 +400,7 @@ async function startServer() {
         data: data || {}
       };
       
-      const response = await adminApp.messaging().send(message);
+      const response = await getMessaging(adminApp).send(message);
       res.json({ success: true, messageId: response });
     } catch (error: any) {
       console.error("FCM Send Error:", error);
@@ -513,7 +409,7 @@ async function startServer() {
   });
 
   // Gateway Settings Management
-  app.get("/api/settings/gateways", async (req, res) => {
+  app.get("/api/settings/gateways", authenticate, authorize(SETTINGS_ROLES), async (req, res) => {
     const { db } = getFirebaseAdmin();
     if (!db) return res.status(500).json({ error: "Database not connected" });
 
@@ -594,7 +490,7 @@ async function startServer() {
     }
   });
 
-  app.put("/api/settings/gateways", async (req, res) => {
+  app.put("/api/settings/gateways", authenticate, authorize(SETTINGS_ROLES), async (req, res) => {
     const { db } = getFirebaseAdmin();
     if (!db) return res.status(500).json({ error: "Database not connected" });
 
@@ -635,7 +531,7 @@ async function startServer() {
   });
 
   // Gateway Connection Testers
-  app.post("/api/settings/test/gupshup", async (req, res) => {
+  app.post("/api/settings/test/gupshup", authenticate, authorize(SETTINGS_ROLES), async (req, res) => {
     let { apiKey, appName } = req.body;
     const { db } = getFirebaseAdmin();
     try {
@@ -659,7 +555,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/settings/test/razorpay", async (req, res) => {
+  app.post("/api/settings/test/razorpay", authenticate, authorize(SETTINGS_ROLES), async (req, res) => {
     let { keyId, webhookSecret } = req.body;
     const { db } = getFirebaseAdmin();
     try {
@@ -691,7 +587,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/settings/test/firebase", async (req, res) => {
+  app.post("/api/settings/test/firebase", authenticate, authorize(SETTINGS_ROLES), async (req, res) => {
     const { db } = getFirebaseAdmin();
     if (!db) return res.status(500).json({ status: "failed", error: "Firebase Admin not initialized" });
     try {
@@ -702,7 +598,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/settings/test/email", async (req, res) => {
+  app.post("/api/settings/test/email", authenticate, authorize(SETTINGS_ROLES), async (req, res) => {
     let { brevoSmtpKey, senderEmail } = req.body;
     const { db } = getFirebaseAdmin();
     const nodemailer = await import("nodemailer");
@@ -735,7 +631,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/settings/test/notifications", async (req, res) => {
+  app.post("/api/settings/test/notifications", authenticate, authorize(SETTINGS_ROLES), async (req, res) => {
     let { fcmServerKey, fcmProject } = req.body;
     const { db } = getFirebaseAdmin();
     try {
@@ -760,7 +656,7 @@ async function startServer() {
     }
   });
 
-  app.get("/api/gupshup/templates/sync", async (req, res) => {
+  app.get("/api/gupshup/templates/sync", authenticate, authorize(SETTINGS_ROLES), async (req, res) => {
     const { db } = getFirebaseAdmin();
     const apiKey = process.env.GUPSHUP_API_KEY;
     if (!apiKey) return res.status(500).json({ error: "Gupshup API Key missing" });
@@ -802,7 +698,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/razorpay/refund", async (req, res) => {
+  app.post("/api/razorpay/refund", authenticate, authorize(FINANCE_ROLES), async (req, res) => {
     try {
       const { paymentId, amount, reason, notes } = req.body;
       const { db } = getFirebaseAdmin();
@@ -838,59 +734,78 @@ async function startServer() {
     }
   });
 
-  // Cron Jobs
-  app.post("/api/cron/daily-orders", async (req, res) => {
+  // Cron Jobs — ingest live customer subscriptions, not stale admin seed
+  app.post("/api/cron/daily-orders", authenticateCron, authorize(['Super Admin', 'Admin']), async (req, res) => {
     try {
-      const { db } = getFirebaseAdmin();
-      if (!db) return res.status(500).json({ error: "Database not connected" });
-      
-      const subscriptionsSnap = await db.collection("subscriptions")
-        .where("status", "==", "Active")
-        .get();
+      const adminDb = getNamedDb(FIRESTORE_DB_IDS.admin);
+      const customerDb = getNamedDb(FIRESTORE_DB_IDS.customer);
+      if (!adminDb) return res.status(503).json({ error: "Database not connected" });
+
+      const today = new Date().toISOString().split("T")[0];
+      const sourceDb = customerDb || adminDb;
+      const statuses = ["active", "Active"];
+      const snaps = await Promise.all(
+        statuses.map((status) => sourceDb.collection("subscriptions").where("status", "==", status).get())
+      );
+      const seen = new Set<string>();
+      const subs = snaps.flatMap((snap) => snap.docs).filter((d) => {
+        if (seen.has(d.id)) return false;
+        seen.add(d.id);
+        return true;
+      });
 
       let ordersGenerated = 0;
       let kitchenTasksGenerated = 0;
+      const batch = adminDb.batch();
+      let writes = 0;
 
-      const batch = db.batch();
+      for (const docSnap of subs) {
+        if (writes >= 400) break;
+        const sub = docSnap.data() as Record<string, unknown>;
+        if (sub.paused === true) continue;
 
-      for (const docSnap of subscriptionsSnap.docs) {
-        const sub = docSnap.data();
-        
-        // Simple mock logic for daily orders (should check if today is a delivery day based on sub.deliveryDays)
-        // We will generate one order for today
-        const orderRef = db.collection("orders").doc();
+        const orderId = `daily_${docSnap.id}_${today}`;
+        const orderRef = adminDb.collection("orders").doc(orderId);
+        const existing = await orderRef.get();
+        if (existing.exists) continue;
+
+        const customerId = String(sub.customerId || sub.userId || "");
         batch.set(orderRef, {
-          orderId: `ORD-${Date.now().toString().substring(5)}`,
-          customerId: sub.customerId || "",
+          orderId,
+          customerId,
+          userId: customerId,
           customerName: sub.customerName || "Customer",
           customerPhone: sub.customerPhone || "",
           subscriptionId: docSnap.id,
           planName: sub.planName || "",
           mealName: sub.mealName || "",
-          deliveryArea: sub.address?.area || "",
+          deliveryArea: (sub.address as { area?: string } | undefined)?.area || "",
           paymentStatus: "Paid",
           orderStatus: "Pending",
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          source: "daily_cron",
         });
         ordersGenerated++;
 
-        // Add to kitchen production
-        const kitchenRef = db.collection("kitchenProduction").doc();
+        const kitchenRef = adminDb.collection("kitchenProduction").doc(`kp_${orderId}`);
         batch.set(kitchenRef, {
-          orderId: orderRef.id,
-          mealName: sub.mealName || "Meal",
+          orderId,
+          mealName: sub.mealName || sub.planName || "Meal",
           quantity: 1,
           preparationStatus: "Pending",
           dietaryNotes: sub.dietaryNotes || "",
           targetCompletionTime: "12:00 PM",
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         });
         kitchenTasksGenerated++;
+        writes += 2;
       }
 
-      await batch.commit();
+      if (writes > 0) {
+        await batch.commit();
+      }
 
-      res.json({ success: true, ordersGenerated, kitchenTasksGenerated });
+      res.json({ success: true, ordersGenerated, kitchenTasksGenerated, date: today });
     } catch (error: any) {
       console.error("Cron Error:", error);
       res.status(500).json({ error: error.message });
@@ -898,7 +813,7 @@ async function startServer() {
   });
 
   // Google Maps Proxy
-  app.post("/api/maps/distance", async (req, res) => {
+  app.post("/api/maps/distance", authenticate, authorize(MAPS_ROLES), async (req, res) => {
     try {
       const { origins, destinations, mode } = req.body;
       const response = await axios.get("https://maps.googleapis.com/maps/api/distancematrix/json", {
@@ -906,7 +821,7 @@ async function startServer() {
           origins,
           destinations,
           mode,
-          key: process.env.VITE_GOOGLE_MAPS_API_KEY
+          key: process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_PLATFORM_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY
         }
       });
       res.json(response.data);
@@ -915,7 +830,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/coupons/validate", async (req, res) => {
+  app.post("/api/coupons/validate", authenticate, authorize(COUPON_ROLES), async (req, res) => {
     try {
       const { code, customerId, amount, planId } = req.body || {};
       const { db } = getFirebaseAdmin();

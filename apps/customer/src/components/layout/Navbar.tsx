@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Wallet, Bell, User, ArrowLeft, Sparkles } from 'lucide-react';
+import { Wallet, Bell, User, ArrowLeft } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/src/context/AuthContext';
 import { WalletService, NotificationService } from '@/src/firebase/services';
 import { triggerHaptic } from '@/src/utils/haptics';
 import { QRScannerButton } from '../common/QRScannerButton';
 import BrandLogo from '../common/BrandLogo';
+import ThemeToggle from './ThemeToggle';
 
 export default function Navbar() {
   const { currentUser, userData } = useAuth();
@@ -52,7 +53,7 @@ export default function Navbar() {
     if (pathname === '/progress') return 'My Journey';
     if (pathname === '/profile') return 'My Profile';
     if (pathname === '/community') return 'Community Hub';
-    if (pathname === '/support') return 'Expert Support';
+    if (pathname === '/support' || pathname === '/dashboard/support' || pathname === '/hub/support') return 'Help & Support';
     return 'TaazaBites';
   };
 
@@ -100,8 +101,9 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Right Side: Wallet Balance, Notifications & Profile */}
+        {/* Right Side: Theme, Wallet Balance, Notifications & Profile */}
         <div className="flex items-center space-x-1.5 sm:space-x-3">
+          <ThemeToggle />
           {currentUser ? (
             <>
               {/* Wallet Button */}

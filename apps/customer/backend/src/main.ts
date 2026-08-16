@@ -12,7 +12,7 @@ async function bootstrap() {
   // Enable CORS for frontend
   app.enableCors();
 
-  const port = process.env.PORT || 3001; // Running on 3001 for now to not clash with main server if started separately
+  const port = process.env.PORT || 3010; // leftover Nest clone; keep off admin :3001
   await app.listen(port, '0.0.0.0');
   
   Logger.log(`NestJS Boilerplate Application is running on: http://0.0.0.0:${port}/api`);

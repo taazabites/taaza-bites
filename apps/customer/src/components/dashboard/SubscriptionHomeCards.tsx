@@ -14,12 +14,12 @@ import { format } from 'date-fns';
 function MealRow({ label, meal }: { label: string; meal?: any }) {
   const status = meal ? deliveryLabel(meal.deliveryStatus || meal.status) : 'Not scheduled';
   return (
-    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-zinc-100 last:border-0">
+    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
       <div>
         <p className="text-xs font-black uppercase tracking-widest text-zinc-400">{label}</p>
-        <p className="text-sm font-bold text-zinc-900 mt-0.5">{meal?.mealName || meal?.name || 'Chef’s menu'}</p>
+        <p className="text-sm font-bold text-zinc-900 dark:text-white mt-0.5">{meal?.mealName || meal?.name || 'Chef’s menu'}</p>
       </div>
-      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{status}</span>
+      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">{status}</span>
     </div>
   );
 }
@@ -71,7 +71,7 @@ export function SubscriptionHomeCards({
         </h1>
         <div className="mt-2 flex items-center gap-2">
           <StatusBadge status={subscription?.status} endDate={subscription?.endDate} />
-          <span className="text-xs font-medium text-zinc-500">Today’s subscription status</span>
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Today’s subscription status</span>
         </div>
       </div>
 
@@ -90,7 +90,7 @@ export function SubscriptionHomeCards({
           <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500">Today’s Meals</h2>
         </div>
         {meals.length === 0 ? (
-          <p className="text-sm text-zinc-500">No meals are scheduled for today.</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">No meals are scheduled for today.</p>
         ) : (
           <>
             <MealRow label="Breakfast" meal={breakfast} />
@@ -105,23 +105,23 @@ export function SubscriptionHomeCards({
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <dt className="text-zinc-400 text-xs">Current plan</dt>
-            <dd className="font-bold">{planNameOf(subscription)}</dd>
+            <dd className="font-bold text-zinc-900 dark:text-white">{planNameOf(subscription)}</dd>
           </div>
           <div>
             <dt className="text-zinc-400 text-xs">Days remaining</dt>
-            <dd className="font-bold">{daysLeft === null ? '—' : Math.max(0, daysLeft)}</dd>
+            <dd className="font-bold text-zinc-900 dark:text-white">{daysLeft === null ? '—' : Math.max(0, daysLeft)}</dd>
           </div>
           <div>
             <dt className="text-zinc-400 text-xs">Meals remaining</dt>
-            <dd className="font-bold">{remaining}</dd>
+            <dd className="font-bold text-zinc-900 dark:text-white">{remaining}</dd>
           </div>
           <div>
             <dt className="text-zinc-400 text-xs">Next delivery</dt>
-            <dd className="font-bold">{nextLabel}</dd>
+            <dd className="font-bold text-zinc-900 dark:text-white">{nextLabel}</dd>
           </div>
           <div className="col-span-2">
             <dt className="text-zinc-400 text-xs">Renewal date</dt>
-            <dd className="font-bold">
+            <dd className="font-bold text-zinc-900 dark:text-white">
               {subscription?.endDate
                 ? format(
                     subscription.endDate?.toDate ? subscription.endDate.toDate() : new Date(subscription.endDate),
@@ -135,25 +135,25 @@ export function SubscriptionHomeCards({
 
       <section className="rounded-[1.75rem] border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
         <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Progress</h2>
-        <div className="h-2 rounded-full bg-zinc-100 overflow-hidden mb-3">
+        <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden mb-3">
           <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
         </div>
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <dt className="text-zinc-400 text-xs">Meals completed</dt>
-            <dd className="font-bold">{completed}</dd>
+            <dd className="font-bold text-zinc-900 dark:text-white">{completed}</dd>
           </div>
           <div>
             <dt className="text-zinc-400 text-xs">Current streak</dt>
-            <dd className="font-bold">{streak ?? 0} days</dd>
+            <dd className="font-bold text-zinc-900 dark:text-white">{streak ?? 0} days</dd>
           </div>
           <div>
             <dt className="text-zinc-400 text-xs">Plan progress</dt>
-            <dd className="font-bold">{progress}%</dd>
+            <dd className="font-bold text-zinc-900 dark:text-white">{progress}%</dd>
           </div>
           <div>
             <dt className="text-zinc-400 text-xs">Money saved</dt>
-            <dd className="font-bold">{savings > 0 ? `₹${savings.toLocaleString()}` : '—'}</dd>
+            <dd className="font-bold text-zinc-900 dark:text-white">{savings > 0 ? `₹${savings.toLocaleString()}` : '—'}</dd>
           </div>
         </dl>
       </section>
@@ -166,16 +166,16 @@ export function SubscriptionHomeCards({
         <dl className="space-y-2 text-sm">
           <div className="flex justify-between">
             <dt className="text-zinc-400">Date</dt>
-            <dd className="font-bold">{nextLabel}</dd>
+            <dd className="font-bold text-zinc-900 dark:text-white">{nextLabel}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-zinc-400">Status</dt>
-            <dd className="font-bold capitalize">{deliveryLabel(delivery?.deliveryStatus || delivery?.status)}</dd>
+            <dd className="font-bold capitalize text-zinc-900 dark:text-white">{deliveryLabel(delivery?.deliveryStatus || delivery?.status)}</dd>
           </div>
           {delivery?.mealType && (
             <div className="flex justify-between">
               <dt className="text-zinc-400">Meal</dt>
-              <dd className="font-bold">{delivery.mealType}</dd>
+              <dd className="font-bold text-zinc-900 dark:text-white">{delivery.mealType}</dd>
             </div>
           )}
           <div className="flex gap-2">

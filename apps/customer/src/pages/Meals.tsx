@@ -281,18 +281,20 @@ export default function MealsPage() {
     
     return list.map((meal: MealItem) => {
       // Look for a corresponding delivery document
-      const delivery = deliveriesList.find(d => 
-        (d.mealId === meal.id || d.mealType?.toLowerCase() === meal.type?.toLowerCase()) && 
-        d.date === dateStr
-      );
+      const delivery = deliveriesList.find(d => {
+        const sameMeal =
+          d.mealId === meal.id ||
+          String(d.mealType || "").toLowerCase() === String(meal.type || "").toLowerCase();
+        const sameDay = d.date === dateStr || d.deliveryDate === dateStr;
+        return sameMeal && sameDay;
+      }) || deliveriesList.find(d => d.date === dateStr || d.deliveryDate === dateStr);
 
-      // Get local modifications if they exist for this meal type or ID
       const override = localMealsOverride[meal.id] || localMealsOverride[meal.type] || {};
 
       return {
         ...meal,
         ...override,
-        deliveryStatus: (delivery?.status || override.deliveryStatus || meal.deliveryStatus || 'Preparing') as "Preparing" | "Ready" | "Out for Delivery" | "Delivered",
+        deliveryStatus: (delivery?.status || delivery?.deliveryStatus || override.deliveryStatus || meal.deliveryStatus || 'Preparing') as "Preparing" | "Ready" | "Out for Delivery" | "Delivered",
         deliveryTime: delivery?.estimatedTime || override.deliveryTime || meal.deliveryTime || 'TBD',
         deliveryAgentName: delivery?.deliveryAgentName || null,
         deliveryAgentPhone: delivery?.deliveryAgentPhone || null

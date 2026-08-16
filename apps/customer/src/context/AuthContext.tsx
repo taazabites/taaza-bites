@@ -19,9 +19,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/** Simulated auth only when explicitly enabled (dev demos). */
+/** Simulated auth only when explicitly enabled — never in production/preview by default. */
 const ALLOW_SIMULATED =
-  import.meta.env.DEV ||
   import.meta.env.VITE_ALLOW_SIMULATED_AUTH === 'true' ||
   import.meta.env.VITE_ALLOW_SIMULATED_AUTH === '1';
 

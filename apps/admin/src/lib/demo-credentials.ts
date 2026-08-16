@@ -19,7 +19,6 @@ export const DEMO_ADMIN = {
 };
 
 export const ALLOW_SIMULATED_AUTH =
-  import.meta.env.DEV ||
   import.meta.env.VITE_ALLOW_SIMULATED_AUTH === "true" ||
   import.meta.env.VITE_ALLOW_SIMULATED_AUTH === "1";
 

@@ -1,5 +1,5 @@
 import http from "http";
-import type { Express, RequestHandler } from "express";
+import type { Express, Request, RequestHandler } from "express";
 import { createProxyMiddleware, type RequestHandler as ProxyHandler } from "http-proxy-middleware";
 
 const CUSTOMER_UPSTREAM = process.env.CUSTOMER_UPSTREAM || "http://127.0.0.1:3000";
@@ -11,7 +11,6 @@ const ADMIN_API_PREFIXES = [
   "/api/super-admin",
   "/api/partner",
   "/api/delivery",
-  "/api/auth",
   "/api/webhooks",
   "/api/razorpay",
   "/api/settings",
@@ -19,9 +18,19 @@ const ADMIN_API_PREFIXES = [
   "/api/cron",
   "/api/maps",
   "/api/notifications",
+  "/api/ops",
+  "/api/coupons",
 ];
 
-const CUSTOMER_API_PREFIXES = ["/api/ai"];
+const CUSTOMER_API_PREFIXES = [
+  "/api/ai",
+  "/api/communication",
+  "/api/wallet",
+  "/api/subscriptions",
+  "/api/rewards",
+  "/api/otp",
+  "/api/plans",
+];
 
 function prefixFilter(prefix: string) {
   return (pathname: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -53,15 +62,49 @@ function matchesPrefix(path: string, prefixes: string[]) {
   return prefixes.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
+function isAdminOrigin(req: Request) {
+  const appHeader = String(req.headers["x-taaza-app"] || "").toLowerCase();
+  const referer = String(req.headers.referer || "");
+  const origin = String(req.headers.origin || "");
+  return (
+    appHeader === "admin" ||
+    referer.includes("/admin") ||
+    origin.includes("/admin") ||
+    origin.includes(":3001")
+  );
+}
+
+/** Split /api/auth and /api/payments so they never silently hit the wrong Express app. */
+function resolveApiUpstream(req: Request): "admin" | "customer" | null {
+  const path = req.path;
+
+  if (path === "/api/auth/verify-token" || path.startsWith("/api/auth/verify-token/")) {
+    return "admin";
+  }
+  if (path === "/api/auth" || path.startsWith("/api/auth/")) {
+    return "customer";
+  }
+
+  if (path.startsWith("/api/payments")) {
+    if (path.startsWith("/api/payments/refund") || path === "/api/payments/config") {
+      return "admin";
+    }
+    if (path.startsWith("/api/payments/activate-zero-order") || path.startsWith("/api/payments/webhook")) {
+      return "customer";
+    }
+    return isAdminOrigin(req) ? "admin" : "customer";
+  }
+
+  if (matchesPrefix(path, ADMIN_API_PREFIXES)) return "admin";
+  if (matchesPrefix(path, CUSTOMER_API_PREFIXES)) return "customer";
+  return null;
+}
+
 const customerProxy = spaProxy(CUSTOMER_UPSTREAM, "customer", prefixFilter("/app"));
 const adminProxy = spaProxy(ADMIN_UPSTREAM, "admin", prefixFilter("/admin"));
 const deliveryProxy = spaProxy(DELIVERY_UPSTREAM, "delivery", prefixFilter("/partner"));
-const adminApiProxy = spaProxy(ADMIN_UPSTREAM, "admin-api", (pathname) =>
-  matchesPrefix(pathname, ADMIN_API_PREFIXES) || pathname.startsWith("/api/payments")
-);
-const customerApiProxy = spaProxy(CUSTOMER_UPSTREAM, "customer-api", (pathname) =>
-  matchesPrefix(pathname, CUSTOMER_API_PREFIXES) || pathname.startsWith("/api/payments")
-);
+const adminApiProxy = spaProxy(ADMIN_UPSTREAM, "admin-api", () => true);
+const customerApiProxy = spaProxy(CUSTOMER_UPSTREAM, "customer-api", () => true);
 
 /** Mount path-prefix proxies so one host serves landing + /app + /admin + /partner */
 export function mountAppGateway(app: Express) {
@@ -79,13 +122,11 @@ export function mountAppGateway(app: Express) {
   app.use(adminProxy as unknown as RequestHandler);
 
   app.use((req, res, next) => {
-    const path = req.path;
-    const referer = String(req.headers.referer || "");
-
-    if (matchesPrefix(path, ADMIN_API_PREFIXES) || (path.startsWith("/api/payments") && referer.includes("/admin"))) {
+    const upstream = resolveApiUpstream(req);
+    if (upstream === "admin") {
       return (adminApiProxy as unknown as RequestHandler)(req, res, next);
     }
-    if (matchesPrefix(path, CUSTOMER_API_PREFIXES) || path.startsWith("/api/payments")) {
+    if (upstream === "customer") {
       return (customerApiProxy as unknown as RequestHandler)(req, res, next);
     }
     next();

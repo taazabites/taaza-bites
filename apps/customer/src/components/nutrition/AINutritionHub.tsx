@@ -111,10 +111,6 @@ export default function AINutritionHub() {
       }
     });
 
-    // Fetch recommendations and health insights automatically on mount
-    fetchRecommendations();
-    fetchHealthInsights();
-
     return () => unsubscribe();
   }, [currentUser]);
 
@@ -176,12 +172,15 @@ export default function AINutritionHub() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: currentUser.uid })
       });
-      if (!res.ok) throw new Error("Meal Engine busy");
+      if (!res.ok) throw new Error("Meal suggestions are unavailable right now");
       const data = await res.json();
+      if (!data?.meals || !Array.isArray(data.meals)) {
+        throw new Error("Meal suggestions are unavailable right now");
+      }
       setRecommendations(data);
     } catch (err: any) {
       console.error(err);
-      showToast(err.message === 'Failed to fetch' ? "Could not connect to the server to get meal suggestions. Please check your internet connection and try again." : (err.message || "Could not sync personalized meal suggestions."), "error");
+      setRecommendations(null);
     } finally {
       setRecLoading(false);
     }
@@ -442,7 +441,7 @@ export default function AINutritionHub() {
             ) : recommendations ? (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {recommendations.meals.map((meal, idx) => (
+                  {(recommendations.meals || []).map((meal, idx) => (
                     <div key={idx} className="p-6 bg-zinc-50 border border-zinc-100/50 rounded-[32px] hover:shadow-md transition-all flex flex-col justify-between h-full">
                       <div>
                         <div className="flex justify-between items-start mb-3">
@@ -530,11 +529,11 @@ export default function AINutritionHub() {
                 </div>
 
                 {/* Suggestions List */}
-                {insights.suggestions.length > 0 && (
+                {(insights.suggestions || []).length > 0 && (
                   <div className="space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">AI Optimization Directives</p>
                     <ul className="space-y-2">
-                      {insights.suggestions.slice(0, 3).map((item, index) => (
+                      {(insights.suggestions || []).slice(0, 3).map((item, index) => (
                         <li key={index} className="text-xs text-zinc-300 flex items-start gap-2.5 leading-relaxed">
                           <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                           <span>{item}</span>
@@ -545,13 +544,13 @@ export default function AINutritionHub() {
                 )}
 
                 {/* Warnings List */}
-                {insights.warnings.length > 0 && (
+                {(insights.warnings || []).length > 0 && (
                   <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
                     <div className="flex items-center gap-2 text-rose-400 font-black text-xs uppercase tracking-wider mb-2">
                       <AlertTriangle className="h-4 w-4 shrink-0" /> Critical Warnings
                     </div>
                     <ul className="space-y-1.5">
-                      {insights.warnings.map((warn, i) => (
+                      {(insights.warnings || []).map((warn, i) => (
                         <li key={i} className="text-[11px] text-zinc-300 leading-normal">{warn}</li>
                       ))}
                     </ul>

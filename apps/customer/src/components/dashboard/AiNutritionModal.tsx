@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bot, X, Send, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LottieLoader } from "@/src/components/common/LottieLoader";
+import { getCustomerAuthHeaders } from "@/src/lib/api-auth";
 
 interface AiNutritionModalProps {
   isOpen: boolean;
@@ -43,14 +44,14 @@ export default function AiNutritionModal({
     try {
       const res = await fetch('/api/ai/nutrition-advisory', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getCustomerAuthHeaders(),
         body: JSON.stringify({
           question: userText,
           healthMetrics: {
             user: user?.name,
             healthScore,
-            caloriesConsumed: nutrition.calories.consumed,
-            proteinConsumed: nutrition.protein.consumed,
+            caloriesConsumed: nutrition?.calories?.consumed,
+            proteinConsumed: nutrition?.protein?.consumed,
             weightGoal
           }
         })

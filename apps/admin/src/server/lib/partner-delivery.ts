@@ -96,6 +96,38 @@ export function toAdminStatusLabel(status: DeliveryOpStatus): string {
   }
 }
 
+export function toCustomerMealStatus(status: DeliveryOpStatus): string {
+  switch (status) {
+    case STATUS.PICKED_UP:
+      return "Ready";
+    case STATUS.OUT_FOR_DELIVERY:
+    case STATUS.ARRIVED:
+      return "Out for Delivery";
+    case STATUS.DELIVERED:
+      return "Delivered";
+    case STATUS.FAILED:
+    case STATUS.CANCELLED:
+    case STATUS.RETURN_TO_KITCHEN:
+      return "Preparing";
+    default:
+      return "Preparing";
+  }
+}
+
+export function toCustomerTrackerStatus(status: DeliveryOpStatus): string {
+  switch (status) {
+    case STATUS.PICKED_UP:
+      return "packed";
+    case STATUS.OUT_FOR_DELIVERY:
+    case STATUS.ARRIVED:
+      return "Out for Delivery";
+    case STATUS.DELIVERED:
+      return "Delivered";
+    default:
+      return "preparing";
+  }
+}
+
 export function canTransition(from: DeliveryOpStatus, to: DeliveryOpStatus): boolean {
   if (from === to) return true;
   return (ALLOWED[from] || []).includes(to);
@@ -199,6 +231,14 @@ async function notifyPartner(
   });
 }
 
+function stripSecrets(patch: Record<string, unknown>) {
+  const clean = { ...patch };
+  delete clean.deliveryOtp;
+  delete clean.otp;
+  delete clean.otpHash;
+  return clean;
+}
+
 async function mirrorAdminDelivery(
   adminDb: Firestore | null,
   deliveryId: string,
@@ -207,11 +247,50 @@ async function mirrorAdminDelivery(
   if (!adminDb) return;
   await adminDb.collection("deliveries").doc(deliveryId).set(
     {
-      ...patch,
+      ...stripSecrets(patch),
+      otpIssued: Boolean(patch.otpIssued),
       updatedAt: new Date().toISOString(),
     },
     { merge: true }
   );
+}
+
+async function mirrorCustomerDelivery(
+  customerDb: Firestore | null,
+  deliveryId: string,
+  patch: Record<string, unknown>
+) {
+  if (!customerDb) return;
+  const opStatus = normalizeOpStatus(patch.opStatus || patch.status);
+  const userId = String(patch.userId || patch.customerId || "");
+  const date = String(patch.deliveryDate || patch.date || "");
+  const payload = stripSecrets({
+    ...patch,
+    userId: userId || patch.customerId,
+    customerId: userId || patch.customerId,
+    date: date || patch.deliveryDate,
+    deliveryDate: date || patch.deliveryDate,
+    status: toCustomerMealStatus(opStatus),
+    deliveryStatus: toCustomerTrackerStatus(opStatus),
+    deliveryAgentName: patch.driverName || patch.deliveryAgentName || "",
+    estimatedTime: patch.estimatedTime || "",
+    opStatus,
+    updatedAt: new Date().toISOString(),
+  });
+  await customerDb.collection("deliveries").doc(deliveryId).set(payload, { merge: true });
+
+  const orderId = String(patch.orderId || "");
+  if (!orderId) return;
+  try {
+    const twins = await customerDb.collection("deliveries").where("orderId", "==", orderId).get();
+    await Promise.all(
+      twins.docs
+        .filter((d) => d.id !== deliveryId)
+        .map((d) => d.ref.set(payload, { merge: true }))
+    );
+  } catch (error) {
+    console.warn("[partner-delivery] customer delivery twin update skipped:", (error as Error).message);
+  }
 }
 
 async function refreshPartnerDuty(deliveryDb: Firestore, partnerId: string) {
@@ -305,18 +384,39 @@ export async function applyStatusChange(opts: {
   if (tsField) patch[tsField] = now;
   await ref.set(patch, { merge: true });
 
-  const adminDb = dbs().admin;
-  await mirrorAdminDelivery(adminDb, deliveryId, {
+  const { admin: adminDb, customer: customerDb } = dbs();
+  const statusMirror = {
     status: toAdminStatusLabel(toStatus),
     opStatus: toStatus,
     driverId: partnerId,
-  });
+    driverName: data.driverName || "",
+    customerId: data.customerId || data.userId || "",
+    userId: data.userId || data.customerId || "",
+    orderId: data.orderId || "",
+    deliveryDate: data.deliveryDate || data.date || "",
+    estimatedTime: data.estimatedTime || "",
+  };
+  await mirrorAdminDelivery(adminDb, deliveryId, statusMirror);
+  await mirrorCustomerDelivery(customerDb, deliveryId, statusMirror);
 
   if (adminDb && toStatus === STATUS.OUT_FOR_DELIVERY) {
     const orderId = String(data.orderId || "");
     if (orderId) {
       await adminDb.collection("orders").doc(orderId).set(
         { status: "Out For Delivery", orderStatus: "Out For Delivery", updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+    }
+  }
+  if (customerDb) {
+    const orderId = String(data.orderId || "");
+    if (orderId) {
+      await customerDb.collection("orders").doc(orderId).set(
+        {
+          orderStatus: toCustomerMealStatus(toStatus),
+          deliveryStatus: toCustomerTrackerStatus(toStatus),
+          updatedAt: new Date().toISOString(),
+        },
         { merge: true }
       );
     }
@@ -642,10 +742,11 @@ export async function assignDeliveries(opts: {
       previousPartnerId: prevPartner || null,
     });
 
-    await mirrorAdminDelivery(admin, deliveryRef.id, {
+    const assignedPatch = {
       deliveryId: deliveryRef.id,
       orderId: order.orderId,
       customerId: order.customerId || "",
+      userId: order.customerId || "",
       customerName,
       customerPhone: order.customerPhone || "",
       deliveryAddress: order.deliveryAddress || "",
@@ -656,17 +757,21 @@ export async function assignDeliveries(opts: {
       status: "Assigned",
       opStatus: STATUS.ASSIGNED,
       estimatedArrival: opts.estimatedTime || "",
+      estimatedTime: opts.estimatedTime || "",
       notes: order.specialInstructions || "",
-      deliveryOtp: otp,
+      otpIssued: true,
       createdAt: new Date(Number(payload.createdAt)).toISOString(),
-    });
+    };
+    await mirrorAdminDelivery(admin, deliveryRef.id, assignedPatch);
+    const { customer } = dbs();
+    await mirrorCustomerDelivery(customer, deliveryRef.id, assignedPatch);
 
     if (admin) {
       await admin.collection("orders").doc(order.orderId).set(
         {
           driverId: opts.partnerId,
           driverName: opts.partnerName,
-          deliveryOtp: otp,
+          otpIssued: true,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }

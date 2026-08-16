@@ -52,8 +52,9 @@ export default function DeliveryExperience() {
     }
   };
 
-  const currentDelivery = activeDeliveries.find(d => d.deliveryStatus !== 'Delivered') || null;
-  const completedDeliveries = activeDeliveries.filter(d => d.deliveryStatus === 'Delivered');
+  const statusOf = (d: Delivery) => String(d.deliveryStatus || "").toLowerCase();
+  const currentDelivery = activeDeliveries.find(d => !statusOf(d).includes("deliver")) || null;
+  const completedDeliveries = activeDeliveries.filter(d => statusOf(d).includes("deliver"));
   const userAddress = (userData as any)?.address || (userData as any)?.deliveryAddress || "Primary Delivery Address";
 
   return (

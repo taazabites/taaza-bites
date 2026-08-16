@@ -28,6 +28,26 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
+    <!-- Theme Initializer (class-based, matches admin) -->
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('theme') || localStorage.getItem('dashboard_theme');
+          var settingsRaw = localStorage.getItem('taaza_app_settings');
+          if (!stored && settingsRaw) {
+            var parsed = JSON.parse(settingsRaw);
+            if (parsed.themeMode === 'system') stored = 'system';
+            else if (parsed.themeMode === 'amoled' || parsed.themeMode === 'dark' || parsed.darkMode) stored = 'dark';
+            else if (parsed.themeMode === 'light') stored = 'light';
+          }
+          var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var isDark = stored === 'dark' || stored === 'amoled' || ((!stored || stored === 'system') && systemDark);
+          document.documentElement.classList.toggle('dark', isDark);
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
+
     <title>TaazaBites - Premium Healthy Lifestyle Membership</title>
 
     <!-- Global site tag (gtag.js) - Google Analytics & Ads & Tag Manager Tags -->

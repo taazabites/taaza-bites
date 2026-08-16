@@ -4,6 +4,7 @@ import {BrowserRouter} from 'react-router-dom';
 import {HelmetProvider} from 'react-helmet-async';
 import App from './App.tsx';
 import {AuthProvider} from './context/AuthContext';
+import {ThemeProvider} from './context/ThemeContext';
 import {ToastProvider} from './context/ToastContext';
 import ErrorBoundary from './components/common/ErrorBoundary.tsx';
 import './index.css';
@@ -170,13 +171,15 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HelmetProvider>
       <AuthProvider>
-        <ToastProvider>
-          <ErrorBoundary>
-            <BrowserRouter basename="/app">
-              <App />
-            </BrowserRouter>
-          </ErrorBoundary>
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <ErrorBoundary>
+              <BrowserRouter basename="/app">
+                <App />
+              </BrowserRouter>
+            </ErrorBoundary>
+          </ToastProvider>
+        </ThemeProvider>
       </AuthProvider>
     </HelmetProvider>
   </StrictMode>,

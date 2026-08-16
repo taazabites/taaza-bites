@@ -9,6 +9,7 @@ import { Address, HealthAssessment, RewardPoints, Wallet, Subscription, User } f
 import { PageHeader } from "../dashboard/PageHeader";
 import { PageTransition } from "../dashboard/PageTransition";
 import { useToast } from "../../context/ToastContext";
+import { useTheme } from "../../context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   User as UserIcon, 
@@ -168,6 +169,7 @@ export default function ProfileCenter() {
   const [searchParams] = useSearchParams();
   const { currentUser, userData, logout, isAdmin } = useAuth();
   const { showToast } = useToast();
+  const { setTheme, toggleTheme } = useTheme();
 
   // Active Tab with URL & Route Sync
   const [activeTab, setActiveTab] = useState<TabType>(() => {
@@ -909,15 +911,9 @@ export default function ProfileCenter() {
 
   // Settings & Toggles
   const toggleDarkMode = () => {
-    const nextDark = !appSettings.darkMode;
-    setAppSettings(prev => ({ ...prev, darkMode: nextDark }));
-    const root = window.document.documentElement;
-    if (nextDark) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-    showToast(`Theme switched to ${nextDark ? "Premium Dark Mode" : "Vibrant Light Mode"}`, "info");
+    toggleTheme();
+    setAppSettings(prev => ({ ...prev, darkMode: !prev.darkMode, themeMode: prev.darkMode ? "light" : "dark" }));
+    showToast(`Theme switched to ${document.documentElement.classList.contains("dark") ? "Vibrant Light Mode" : "Premium Dark Mode"}`, "info");
   };
 
   // Delete Account Action
@@ -3426,6 +3422,8 @@ export default function ProfileCenter() {
                                   key={mode.id}
                                   type="button"
                                   onClick={() => {
+                                    const nextPref = mode.id === "amoled" ? "dark" : (mode.id as "light" | "dark" | "system");
+                                    setTheme(nextPref);
                                     setAppSettings(prev => ({ 
                                       ...prev, 
                                       themeMode: mode.id,

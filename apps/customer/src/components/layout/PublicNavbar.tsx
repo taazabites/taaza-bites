@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ArrowRight, User, Sparkles, ShoppingBag, LayoutDashboard } from "lucide-react";
 import { cn } from "../../lib/utils";
 import BrandLogo from "../common/BrandLogo";
+import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "@/src/context/AuthContext";
 import { triggerHaptic } from "@/src/utils/haptics";
 import { throttle } from "../../lib/performance";
@@ -37,8 +38,8 @@ export default function PublicNavbar() {
         className={cn(
           "max-w-6xl mx-auto h-16 px-4 sm:px-6 flex items-center justify-between transition-all duration-500 pointer-events-auto rounded-full border",
           scrolled 
-            ? "bg-white/90 backdrop-blur-2xl border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.12)]" 
-            : "bg-white/70 backdrop-blur-md border-white/20 shadow-sm"
+            ? "bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border-white/20 dark:border-zinc-800 shadow-[0_8px_32px_rgba(0,0,0,0.12)]" 
+            : "bg-white/70 dark:bg-zinc-950/70 backdrop-blur-md border-white/20 dark:border-zinc-800 shadow-sm"
         )}
       >
         <Link to="/" className="flex items-center gap-2 group">
@@ -53,7 +54,7 @@ export default function PublicNavbar() {
               to={link.path} 
               className={cn(
                 "text-[10px] font-black uppercase tracking-[0.25em] transition-all hover:text-emerald-600 relative group flex items-center gap-1.5",
-                location.pathname === link.path ? "text-emerald-600" : "text-zinc-500"
+                location.pathname === link.path ? "text-emerald-600" : "text-zinc-500 dark:text-zinc-400"
               )}
             >
               {(link as any).highlight && <Sparkles className="w-3 h-3 text-amber-500 animate-pulse" />}
@@ -69,6 +70,7 @@ export default function PublicNavbar() {
         </nav>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           {currentUser ? (
             <Link 
               to="/dashboard"
@@ -94,7 +96,7 @@ export default function PublicNavbar() {
 
           {/* Mobile Menu Button */}
           <button 
-            className="lg:hidden w-11 h-11 flex items-center justify-center text-zinc-950 hover:bg-zinc-100/90 active:scale-90 rounded-full cursor-pointer transition-all border border-zinc-200/50 shadow-2xs"
+            className="lg:hidden w-11 h-11 flex items-center justify-center text-zinc-950 dark:text-white hover:bg-zinc-100/90 dark:hover:bg-zinc-800 active:scale-90 rounded-full cursor-pointer transition-all border border-zinc-200/50 dark:border-zinc-700 shadow-2xs"
             onClick={() => {
               triggerHaptic('light');
               setIsOpen(!isOpen);
@@ -122,7 +124,7 @@ export default function PublicNavbar() {
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              className="lg:hidden absolute top-20 left-3 right-3 sm:left-6 sm:right-6 bg-white/95 backdrop-blur-2xl rounded-[2rem] border border-slate-200/80 shadow-2xl p-6 sm:p-8 overflow-hidden pointer-events-auto z-[102]"
+              className="lg:hidden absolute top-20 left-3 right-3 sm:left-6 sm:right-6 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl rounded-[2rem] border border-slate-200/80 dark:border-zinc-800 shadow-2xl p-6 sm:p-8 overflow-hidden pointer-events-auto z-[102]"
             >
             <div className="flex flex-col gap-6">
               {navLinks.map((link) => (
@@ -132,7 +134,7 @@ export default function PublicNavbar() {
                   onClick={() => setIsOpen(false)}
                   className={cn(
                     "font-black text-3xl tracking-tighter transition-all flex items-center justify-between group",
-                    location.pathname === link.path ? "text-emerald-600" : "text-zinc-950"
+                    location.pathname === link.path ? "text-emerald-600" : "text-zinc-950 dark:text-white"
                   )}
                 >
                   <span className="flex items-center gap-3">

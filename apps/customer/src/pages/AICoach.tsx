@@ -34,6 +34,7 @@ import { Card, Button } from '@/src/components/ui/primitives';
 import { useAuth } from '@/src/context/AuthContext';
 import { useToast } from '@/src/context/ToastContext';
 import { HealthService } from '@/src/firebase/services';
+import { getCustomerAuthHeaders } from '@/src/lib/api-auth';
 import { triggerHaptic } from '@/src/utils/haptics';
 import { cn } from '@/src/lib/utils';
 import DashboardLayout from "../components/dashboard/DashboardLayout";
@@ -261,7 +262,7 @@ export default function AICoachPage() {
       // Call backend AI route
       const res = await fetch('/api/ai/nutrition-advisory', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getCustomerAuthHeaders(),
         body: JSON.stringify({
           question: promptText,
           healthMetrics: healthProfile ? {

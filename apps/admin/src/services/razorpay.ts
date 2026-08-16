@@ -1,6 +1,7 @@
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Payment } from '../types';
+import { adminFetch } from '../lib/api';
 
 declare global {
   interface Window {
@@ -25,7 +26,7 @@ export const razorpayService = {
 
   createOrder: async (amount: number, customerId: string, customerName: string, metadata: any = {}) => {
     try {
-      const response = await fetch('/api/payments/create-order', {
+      const response = await adminFetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,7 +80,7 @@ export const razorpayService = {
 
   verifyPayment: async (paymentDetails: any) => {
     try {
-      const response = await fetch('/api/payments/verify', {
+      const response = await adminFetch('/api/payments/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(paymentDetails)
@@ -99,7 +100,7 @@ export const razorpayService = {
 
   processRefund: async (paymentId: string, amount?: number, reason?: string) => {
     try {
-      const response = await fetch('/api/payments/refund', {
+      const response = await adminFetch('/api/payments/refund', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentId, amount, reason })

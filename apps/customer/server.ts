@@ -30,6 +30,7 @@ import Razorpay from "razorpay";
 const RazorpayClient = (Razorpay as any).default || Razorpay;
 import crypto from "crypto";
 import { adminDb, adminAuth, actualProjectId } from "./src/firebase/firebase-admin.ts";
+import { mirrorCheckoutToOps } from "./src/server/lib/ops-mirror.ts";
 import { BillingService } from "./src/server/services/billing.ts";
 import { SubscriptionService } from "./src/server/services/subscription.ts";
 import { Logger } from "./src/server/services/logger.ts";
@@ -1107,6 +1108,23 @@ app.post("/api/payments/verify", verifyLimiter, validateReplayProtection, authen
         }
 
         await batch.commit();
+        void mirrorCheckoutToOps({
+          userId,
+          orderNumber,
+          subscriptionId: subRef.id,
+          planId: plan.id,
+          planName,
+          amount: Number(order.amount) / 100,
+          customerName,
+          customerEmail: userData?.email || "",
+          customerPhone: userData?.phone || userData?.phoneNumber || "",
+          durationDays: duration,
+          mealsRemaining: totalMeals,
+          nextDeliveryDate: tomorrowStr,
+          paymentId: razorpay_payment_id,
+          deliveryId: `del_${subRef.id}_${tomorrowStr}`,
+          coupon: couponCode || "",
+        }).catch((err) => console.error("[ops-mirror]", err?.message || err));
         return res.json({
           success: true,
           orderNumber,
@@ -1258,6 +1276,16 @@ app.post("/api/payments/activate-zero-order", authenticateRequest, async (req: a
     }
 
     const ordNum = "ORD-" + Date.now().toString().slice(-6) + Math.floor(1000 + Math.random() * 9000);
+    const duration = customizations?.durationDays || plan.durationDays || 30;
+    const mealsPerDay = customizations?.mealsPerDay || plan.mealsPerDay || 1;
+    const totalMeals = customizations?.totalMeals || (duration * mealsPerDay);
+    const tomorrow = new Date();
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    const userSnap = await adminDb.collection("users").doc(userId).get();
+    const customerName =
+      userSnap.data()?.displayName || userSnap.data()?.name || "Valued Customer";
 
     // 6. Execute DB Writes Atomically via Transaction
     await adminDb.runTransaction(async (transaction) => {
@@ -1439,6 +1467,19 @@ app.post("/api/payments/activate-zero-order", authenticateRequest, async (req: a
         }
       }
     });
+
+    void mirrorCheckoutToOps({
+      userId,
+      orderNumber: ordNum,
+      subscriptionId: userId,
+      planId,
+      planName: plan.name || plan.planName || "Plan",
+      amount: 0,
+      customerName,
+      durationDays: duration,
+      mealsRemaining: totalMeals,
+      nextDeliveryDate: tomorrowStr,
+    }).catch((err) => console.error("[ops-mirror]", err?.message || err));
 
     return res.json({ success: true, orderNumber: ordNum });
   } catch (error: any) {
@@ -1898,69 +1939,6 @@ app.post("/api/plans/seed", authenticateRequest, requireAdmin, async (req, res) 
 
 
 /**
- * RAZORPAY WEBHOOK HANDLER
- * The gold standard for payment verification.
- */
-app.post("/api/payments/webhook", express.raw({ type: 'application/json' }), async (req: any, res) => {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-  const signature = req.headers["x-razorpay-signature"];
-
-  if (!secret || !signature) {
-    console.error("[Webhook Error] Missing secret or signature");
-    return res.status(400).send("Webhook configuration missing");
-  }
-
-  try {
-    // 1. Verify Webhook Signature
-    const shasum = crypto.createHmac("sha256", secret);
-    shasum.update(req.body);
-    const digest = shasum.digest("hex");
-
-    if (digest !== signature) {
-      console.error("[Webhook Error] Invalid signature");
-      return res.status(400).send("Invalid signature");
-    }
-
-    const event = JSON.parse(req.body.toString());
-    await Logger.info('PAYMENT_WEBHOOK', `Received event ${event.event}`, { paymentId: event.payload.payment.entity.id });
-
-    // 2. Handle Payment Captured
-    if (event.event === "payment.captured") {
-      const payment = event.payload.payment.entity;
-      const { userId, planId, addressId, deliverySlot } = payment.notes;
-
-      if (userId && planId) {
-        await Logger.info('SUBSCRIPTION', `Activating subscription for ${userId}`, { planId });
-        await SubscriptionService.activateSubscription(
-          userId, 
-          planId, 
-          payment.id, 
-          addressId, 
-          deliverySlot
-        );
-        
-        // Log transaction
-        await adminDb.collection("payments").doc(payment.id).set({
-          userId,
-          amount: payment.amount / 100,
-          status: 'completed',
-          method: payment.method,
-          razorpayPaymentId: payment.id,
-          razorpayOrderId: payment.order_id,
-          notes: payment.notes,
-          createdAt: FieldValue.serverTimestamp()
-        });
-      }
-    }
-
-    res.json({ status: "ok" });
-  } catch (error: any) {
-    console.error("[Webhook processing failed]", error);
-    res.status(500).send("Internal Server Error");
-  }
-});
-
-/**
  * APP CHECK MIDDLEWARE (Placeholder logic)
  * In a production environment, you would verify the X-Firebase-AppCheck token.
  */
@@ -2254,14 +2232,18 @@ app.post("/api/ai/recommend-meals", async (req, res) => {
     let userProfile: any = null;
     let healthAssessment: any = null;
 
-    if (userId) {
-      const userSnap = await adminDb.collection('users').doc(userId).get();
-      if (userSnap.exists) {
-        userProfile = userSnap.data();
-      }
-      const healthSnap = await adminDb.collection('healthAssessments').doc(userId).get();
-      if (healthSnap.exists) {
-        healthAssessment = healthSnap.data();
+    if (userId && adminDb) {
+      try {
+        const userSnap = await adminDb.collection('users').doc(userId).get();
+        if (userSnap.exists) {
+          userProfile = userSnap.data();
+        }
+        const healthSnap = await adminDb.collection('healthAssessments').doc(userId).get();
+        if (healthSnap.exists) {
+          healthAssessment = healthSnap.data();
+        }
+      } catch (e) {
+        console.warn("recommend-meals profile lookup skipped", e);
       }
     }
 
@@ -2384,10 +2366,14 @@ app.post("/api/ai/health-insights", async (req, res) => {
     const { userId } = req.body;
     let healthAssessment: any = null;
 
-    if (userId) {
-      const healthSnap = await adminDb.collection('healthAssessments').doc(userId).get();
-      if (healthSnap.exists) {
-        healthAssessment = healthSnap.data();
+    if (userId && adminDb) {
+      try {
+        const healthSnap = await adminDb.collection('healthAssessments').doc(userId).get();
+        if (healthSnap.exists) {
+          healthAssessment = healthSnap.data();
+        }
+      } catch (e) {
+        console.warn("health-insights profile lookup skipped", e);
       }
     }
 

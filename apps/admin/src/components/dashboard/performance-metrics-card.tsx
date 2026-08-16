@@ -27,6 +27,7 @@ import {
   ResponsiveContainer
 } from "recharts"
 import { systemMonitoringService } from "../../services/system-monitoring"
+import { adminFetch } from "@/src/lib/api"
 
 interface PerfLogEntry {
   id: string
@@ -241,7 +242,7 @@ export function PerformanceMetricsCard() {
     try {
       // Perform a real network latency probe to backend/firebase
       const probeStart = performance.now()
-      await fetch('/api/health', { method: 'GET', cache: 'no-store' }).catch(() => {})
+      await adminFetch('/api/ops/health', { method: 'GET', cache: 'no-store' }).catch(() => {})
       const probeDuration = Math.round(performance.now() - probeStart)
 
       performance.mark(endMark)

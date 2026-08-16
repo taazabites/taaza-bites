@@ -215,21 +215,12 @@ export default function LoginOTP() {
         inputRefs.current[0]?.focus();
       }, 300);
     } catch (e: any) {
-      console.warn('Firebase Phone Auth SMS failure, routing to auto-bypass:', e);
+      console.error('Firebase Phone Auth SMS failure:', e);
       const friendlyError = getFriendlyFirebaseError(e);
-      setAuthError(`SMS Gateway: ${friendlyError}. Auto-redirected to high-availability sandbox bypass.`);
-      showToast('Live SMS gateway overloaded. Switched to Instant Demo Mode.', 'info');
-      
-      // Auto-fallback bypass setup so that user can instantly proceed with 123456
-      setIsFallbackMode(true);
-      setConfirmationResult({} as any); // Set non-null dummy confirmation result to advance to Step 2
-      setInitialTimer(60);
-      setTimer(60);
-      setOtpArray(['1', '2', '3', '4', '5', '6']); // pre-fill sandbox OTP for ultimate fluid user flow
-      
-      setTimeout(() => {
-        inputRefs.current[0]?.focus();
-      }, 500);
+      setAuthError(`Could not send SMS: ${friendlyError}`);
+      showToast(friendlyError || 'Could not send the verification code. Please try again.', 'error');
+      setIsFallbackMode(false);
+      setConfirmationResult(null);
     } finally {
       setLoading(false);
       setLoadingStepText('');
@@ -291,8 +282,8 @@ export default function LoginOTP() {
           return;
         } catch (firebaseConfirmError: any) {
           console.error('Firebase code confirmation failed:', firebaseConfirmError);
-          setAuthError('Invalid code. Please re-check the 6 digits or use the 123456 bypass code.');
-          showToast('Invalid verification code. Try again or click bypass code.', 'error');
+          setAuthError('Invalid code. Please re-check the 6 digits.');
+          showToast('Invalid verification code. Please try again.', 'error');
           return;
         }
       }

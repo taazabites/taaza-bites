@@ -278,16 +278,20 @@ export const paymentsService = {
 
       // Hit our backend to execute razorpay refund
       const backendUrl = import.meta.env.VITE_APP_URL || '';
-      try {
-        await axios.post(`${backendUrl}/api/payments/refund`, {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await axios.post(`${backendUrl}/api/payments/refund`, {
           paymentId,
           amount,
           reason,
           notes
+        }, {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : '',
+            'X-Taaza-App': 'admin',
+          },
         });
-      } catch (err: any) {
-        console.warn("Razorpay refund API error, falling back to local simulation:", err);
-        // Do not throw; proceed to local Firestore simulation so preview continues to work smoothly
+      if (response.status >= 400) {
+        throw new Error(response.data?.error || 'Refund API failed');
       }
 
       // 2. Write refund record
