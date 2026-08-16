@@ -2,6 +2,12 @@
 // Set project ID before any other imports
 import { readFileSync } from 'fs';
 import path from 'path';
+import { config as loadDotenv } from 'dotenv';
+
+// Load server secrets (Airtel DLT, Razorpay, etc.) before anything else reads process.env
+loadDotenv({ path: path.resolve(process.cwd(), '.env') });
+loadDotenv({ path: path.resolve(process.cwd(), '../.env') });
+
 try {
   const config = JSON.parse(readFileSync(path.resolve(process.cwd(), 'firebase-applet-config.json'), 'utf-8'));
   process.env.GOOGLE_CLOUD_PROJECT = config.projectId;
@@ -193,7 +199,7 @@ const generalApiLimiter = rateLimit({
 
 const verifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 });
 
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || "3000", 10);
 
 // Custom Security and Compliance Middleware
 app.use((req, res, next) => {
@@ -633,6 +639,164 @@ app.post("/api/otp/send-high-priority", strictOtpLimiter, async (req, res) => {
   } catch (err: any) {
     console.error("OTP Dispatch Error:", err);
     return res.status(500).json(buildErrorResponse("OTP_DISPATCH_FAILED", "High priority SMS dispatch failed. Please try again."));
+  }
+});
+
+// --- Airtel DLT OTP (customer login) ---
+import {
+  getAirtelConfigStatus,
+  sendAirtelTemplateSms,
+  type SmsTemplateKey,
+} from "./src/lib/airtel-dlt-sms.server.ts";
+import { issueAirtelOtp, verifyAirtelOtp } from "./src/lib/airtel-otp.server.ts";
+
+app.get("/api/sms/airtel/status", (_req, res) => {
+  const status = getAirtelConfigStatus();
+  return res.json({
+    success: true,
+    provider: status.loginOtpReady ? "airtel_dlt" : "firebase_or_sandbox",
+    loginOtpReady: status.loginOtpReady,
+    configured: status.configured,
+    header: status.header,
+    // Never expose secrets; only list which env keys are still empty
+    missing: status.missing,
+  });
+});
+
+app.post("/api/otp/dlt/send", strictOtpLimiter, async (req, res) => {
+  try {
+    const { phoneNumber, purpose = "login" } = req.body || {};
+    const cleanPhone = String(phoneNumber || "").replace(/\D/g, "").slice(-10);
+    if (cleanPhone.length !== 10) {
+      return res.status(400).json(buildErrorResponse("INVALID_PHONE", "Valid 10-digit mobile number required."));
+    }
+
+    const lockout = defaultLockoutTracker.isLockedOut(cleanPhone);
+    if (lockout.isLocked) {
+      return res.status(429).json(buildErrorResponse(
+        "ACCOUNT_LOCKED",
+        `Account is temporarily locked. Try again in ${lockout.remainingMinutes || 15} minutes.`
+      ));
+    }
+
+    const otpPurpose = purpose === "security" || purpose === "delivery" ? purpose : "login";
+    const result = await issueAirtelOtp(cleanPhone, otpPurpose);
+    if (!result.success) {
+      return res.status(502).json(buildErrorResponse("OTP_DISPATCH_FAILED", result.error || "Failed to send OTP."));
+    }
+
+    return res.json({
+      success: true,
+      provider: result.simulated ? "airtel_dlt_simulated" : "airtel_dlt",
+      phoneNumber: `+91${cleanPhone}`,
+      expiresInSeconds: result.expiresInSeconds,
+      ...(result.debugOtp ? { debugOtp: result.debugOtp } : {}),
+    });
+  } catch (err: any) {
+    console.error("Airtel DLT OTP send error:", err);
+    return res.status(500).json(buildErrorResponse("OTP_DISPATCH_FAILED", "OTP dispatch failed. Please try again."));
+  }
+});
+
+app.post("/api/otp/dlt/verify", authLimiter, async (req, res) => {
+  try {
+    const { phoneNumber, otp, purpose = "login" } = req.body || {};
+    const cleanPhone = String(phoneNumber || "").replace(/\D/g, "").slice(-10);
+    if (cleanPhone.length !== 10) {
+      return res.status(400).json(buildErrorResponse("INVALID_PHONE", "Valid 10-digit mobile number required."));
+    }
+
+    const lockout = defaultLockoutTracker.isLockedOut(cleanPhone);
+    if (lockout.isLocked) {
+      return res.status(429).json(buildErrorResponse(
+        "ACCOUNT_LOCKED",
+        `Account is temporarily locked. Try again in ${lockout.remainingMinutes || 15} minutes.`
+      ));
+    }
+
+    const otpPurpose = purpose === "security" || purpose === "delivery" ? purpose : "login";
+    const verified = verifyAirtelOtp(cleanPhone, String(otp || ""), otpPurpose);
+    if (!verified.ok) {
+      const record = defaultLockoutTracker.recordFailedAttempt(cleanPhone);
+      if (record?.isNowLocked) {
+        return res.status(429).json(buildErrorResponse(
+          "ACCOUNT_LOCKED",
+          `Too many failed attempts. Locked for ${record.remainingMinutes || 15} minutes.`
+        ));
+      }
+      return res.status(401).json(buildErrorResponse("INVALID_OTP", verified.error || "Invalid OTP."));
+    }
+
+    defaultLockoutTracker.resetAttempts(cleanPhone);
+
+    // Delivery / security OTP may only need verification success
+    if (otpPurpose !== "login") {
+      return res.json({ success: true, verified: true, purpose: otpPurpose });
+    }
+
+    const e164 = `+91${cleanPhone}`;
+    let userRecord;
+    try {
+      userRecord = await adminAuth.getUserByPhoneNumber(e164);
+    } catch {
+      userRecord = await adminAuth.createUser({ phoneNumber: e164 });
+    }
+
+    const uid = userRecord.uid;
+    const customerRef = adminDb.collection("users").doc(uid);
+    const snap = await customerRef.get();
+    if (!snap.exists) {
+      await customerRef.set({
+        uid,
+        phoneNumber: e164,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        status: "active",
+        role: "customer",
+        walletBalance: 0,
+        rewardPoints: 0,
+      }, { merge: true });
+
+      // Welcome SMS (best-effort; ignores missing template id)
+      void sendAirtelTemplateSms("WELCOME", cleanPhone, ["Customer"]);
+    } else {
+      await customerRef.set({ updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    }
+
+    const customToken = await adminAuth.createCustomToken(uid, {
+      phoneNumber: e164,
+      loginProvider: "airtel_dlt_otp",
+    });
+
+    return res.json({
+      success: true,
+      verified: true,
+      uid,
+      customToken,
+      phoneNumber: e164,
+      isNewUser: !snap.exists,
+    });
+  } catch (err: any) {
+    console.error("Airtel DLT OTP verify error:", err);
+    return res.status(500).json(buildErrorResponse("VERIFICATION_ERROR", "OTP verification failed. Please try again."));
+  }
+});
+
+/** Internal/admin helper to fire any approved DLT template (auth required). */
+app.post("/api/sms/airtel/send", authenticateRequest, async (req: any, res) => {
+  try {
+    const { phoneNumber, templateKey, vars = [] } = req.body || {};
+    if (!phoneNumber || !templateKey) {
+      return res.status(400).json(buildErrorResponse("BAD_REQUEST", "phoneNumber and templateKey are required."));
+    }
+    const result = await sendAirtelTemplateSms(templateKey as SmsTemplateKey, phoneNumber, vars);
+    if (!result.success) {
+      return res.status(502).json(buildErrorResponse("SMS_FAILED", result.error || "SMS send failed."));
+    }
+    return res.json({ success: true, simulated: !!result.simulated, messageRequestId: result.messageRequestId });
+  } catch (err: any) {
+    console.error("Airtel template send error:", err);
+    return res.status(500).json(buildErrorResponse("SMS_FAILED", "SMS send failed."));
   }
 });
 

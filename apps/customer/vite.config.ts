@@ -7,7 +7,8 @@ import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig(() => {
   return {
-    base: '/app/',
+    // Local gateway uses /app/; App Hosting backends serve at domain root (/)
+    base: process.env.VITE_BASE || '/app/',
     plugins: [
       react(), 
       tailwindcss(),

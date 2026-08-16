@@ -1,0 +1,25 @@
+Firebase App Hosting — reconnect backends (owner Gmail: Firebase project)
+======================================================================
+Project: gen-lang-client-0684462293 (taazabites subcripon)
+GitHub repo: taazabites/taaza-bites  (branch: main)
+
+EXISTING BACKENDS (edit — do not create duplicates):
+  1) taaza-landing          → root directory: apps/landing
+  2) taazabites-subscription → root directory: apps/customer
+  3) taazabites-admin        → root directory: apps/admin
+
+STEPS (Firebase Console, old Gmail):
+  1. Open https://console.firebase.google.com/project/gen-lang-client-0684462293/apphosting
+  2. For EACH backend → open it → Settings → Deployment
+  3. Connect / switch GitHub to account that owns taazabites/taaza-bites
+     (install Firebase App Hosting GitHub App if prompted)
+  4. Repository: taazabites/taaza-bites
+  5. Live branch: main
+  6. Root directory: as listed above
+  7. Save → Create rollout / Redeploy
+
+After rollout, open each backend’s Hosted URL.
+
+ENV / SECRETS (later, per backend Settings → Environment):
+  Copy needed keys from apps/customer/.env and apps/admin (Razorpay, Firebase, etc.)
+  Never commit real .env secrets to GitHub.
