@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { setupRecaptcha, signInWithPhone, signInWithGoogle } from '../firebase/auth';
+import { setupRecaptcha, signInWithPhone, signInWithGoogle, signInWithAirtelCustomToken } from '../firebase/auth';
 import { ConfirmationResult } from 'firebase/auth';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +33,8 @@ export default function LoginOTP() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otpArray, setOtpArray] = useState<string[]>(['', '', '', '', '', '']);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [airtelOtpPending, setAirtelOtpPending] = useState(false);
+  const [useAirtelDlt, setUseAirtelDlt] = useState(false);
   const [isFallbackMode, setIsFallbackMode] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,6 +53,25 @@ export default function LoginOTP() {
   const location = useLocation();
   const { showToast } = useToast();
   const { currentUser, loginSimulated, loginGoogleSimulated } = useAuth();
+
+  const otpStepActive = Boolean(confirmationResult || airtelOtpPending);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/sms/airtel/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data?.loginOtpReady) {
+          setUseAirtelDlt(true);
+        }
+      } catch {
+        // Keep Firebase Phone Auth when status check fails
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleSendPasswordReset = async () => {
     if (!resetIdentifier || resetIdentifier.trim().length < 5) {
@@ -74,13 +95,13 @@ export default function LoginOTP() {
 
   // Auto-focus first OTP input when step changes
   useEffect(() => {
-    if (confirmationResult && !isVerified) {
+    if (otpStepActive && !isVerified) {
       const timerId = setTimeout(() => {
         inputRefs.current[0]?.focus();
       }, 400);
       return () => clearTimeout(timerId);
     }
-  }, [confirmationResult, isVerified]);
+  }, [otpStepActive, isVerified]);
 
   const getFriendlyFirebaseError = (error: any): string => {
     const code = error?.code || '';
@@ -197,15 +218,45 @@ export default function LoginOTP() {
     setAuthError(null);
 
     try {
+      // Prefer Airtel DLT when PE ID + IQ credentials + OTP template are configured
+      if (useAirtelDlt) {
+        setLoadingStepText(`Dispatching SMS OTP to +91 ${phoneNumber} via Airtel DLT...`);
+        const res = await fetch('/api/otp/dlt/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber, purpose: 'login' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.error?.message || data?.message || data?.error || 'Airtel OTP dispatch failed');
+        }
+        setConfirmationResult(null);
+        setAirtelOtpPending(true);
+        setIsFallbackMode(false);
+        setInitialTimer(Math.min(data.expiresInSeconds || 600, 120));
+        setTimer(Math.min(data.expiresInSeconds || 600, 120));
+        showToast(
+          data.provider === 'airtel_dlt_simulated'
+            ? 'OTP ready (Airtel simulated — check server logs in dev)'
+            : 'Verification code sent via SMS successfully',
+          'success'
+        );
+        if (data.debugOtp && import.meta.env.DEV) {
+          console.info('[DEV] Airtel OTP:', data.debugOtp);
+        }
+        setTimeout(() => inputRefs.current[0]?.focus(), 300);
+        return;
+      }
+
       await new Promise(r => setTimeout(r, 200));
       setLoadingStepText('Configuring security verification...');
-      // Pass actual DOM ref element if available, otherwise fallback to ID string
       const verifier = setupRecaptcha(recaptchaContainerRef.current || 'recaptcha-container');
 
       setLoadingStepText(`Dispatching SMS OTP to +91 ${phoneNumber}...`);
       const result = await signInWithPhone(`+91${phoneNumber}`, verifier);
       
       setConfirmationResult(result);
+      setAirtelOtpPending(false);
       setIsFallbackMode(false);
       setInitialTimer(60);
       setTimer(60);
@@ -215,12 +266,15 @@ export default function LoginOTP() {
         inputRefs.current[0]?.focus();
       }, 300);
     } catch (e: any) {
-      console.error('Firebase Phone Auth SMS failure:', e);
-      const friendlyError = getFriendlyFirebaseError(e);
+      console.error('OTP SMS failure:', e);
+      const friendlyError = useAirtelDlt
+        ? (e?.message || 'Unable to dispatch SMS code at this time.')
+        : getFriendlyFirebaseError(e);
       setAuthError(`Could not send SMS: ${friendlyError}`);
       showToast(friendlyError || 'Could not send the verification code. Please try again.', 'error');
       setIsFallbackMode(false);
       setConfirmationResult(null);
+      setAirtelOtpPending(false);
     } finally {
       setLoading(false);
       setLoadingStepText('');
@@ -239,6 +293,34 @@ export default function LoginOTP() {
     setAuthError(null);
 
     try {
+      // Airtel DLT OTP → Firebase custom token
+      if (airtelOtpPending && !isFallbackMode) {
+        setLoadingStepText('Confirming Airtel DLT verification...');
+        const res = await fetch('/api/otp/dlt/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber, otp: codeToVerify, purpose: 'login' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.customToken) {
+          setAuthError(data?.error?.message || data?.message || 'Invalid code. Please re-check the 6 digits.');
+          showToast('Invalid verification code. Please try again.', 'error');
+          return;
+        }
+
+        setLoadingStepText('Opening secure session...');
+        await signInWithAirtelCustomToken(data.customToken);
+
+        setLoadingStepText('Welcome to TaazaBites!');
+        showToast('Logged in successfully! Welcome to TaazaBites 🎉', 'success');
+        setIsVerified(true);
+        const from = (location.state as any)?.from?.pathname || (location.state as any)?.from || '/dashboard';
+        setTimeout(() => {
+          navigate(from, { replace: true });
+        }, 800);
+        return;
+      }
+
       // 1. Firebase Confirmation Verification
       if (confirmationResult && !isFallbackMode) {
         try {
@@ -317,6 +399,7 @@ export default function LoginOTP() {
   // Reset Flow
   const handleResetFlow = () => {
     setConfirmationResult(null);
+    setAirtelOtpPending(false);
     setIsFallbackMode(false);
     setAuthError(null);
     setOtpArray(['', '', '', '', '', '']);
@@ -536,15 +619,15 @@ export default function LoginOTP() {
           <div className="flex items-center gap-3 mb-6">
             <div className="flex items-center gap-2">
               <motion.div 
-                animate={!confirmationResult ? { scale: [1, 1.1, 1] } : {}}
+                animate={!otpStepActive ? { scale: [1, 1.1, 1] } : {}}
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all duration-300 ${
-                  !confirmationResult ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25' : 'bg-emerald-100 text-emerald-800'
+                  !otpStepActive ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25' : 'bg-emerald-100 text-emerald-800'
                 }`}
               >
-                {!confirmationResult ? '1' : <Check className="w-4 h-4 stroke-[3]" />}
+                {!otpStepActive ? '1' : <Check className="w-4 h-4 stroke-[3]" />}
               </motion.div>
               <span className={`text-xs font-black transition-colors duration-300 ${
-                !confirmationResult ? 'text-slate-900' : 'text-slate-400'
+                !otpStepActive ? 'text-slate-900' : 'text-slate-400'
               }`}>Enter Phone</span>
             </div>
             
@@ -552,19 +635,19 @@ export default function LoginOTP() {
               <motion.div 
                 className="h-full bg-emerald-600"
                 initial={{ width: "0%" }}
-                animate={{ width: confirmationResult ? "100%" : "0%" }}
+                animate={{ width: otpStepActive ? "100%" : "0%" }}
                 transition={{ duration: 0.4 }}
               />
             </div>
             
             <div className="flex items-center gap-2">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all duration-300 ${
-                confirmationResult ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25' : 'bg-slate-100 text-slate-400'
+                otpStepActive ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25' : 'bg-slate-100 text-slate-400'
               }`}>
                 2
               </div>
               <span className={`text-xs font-black transition-colors duration-300 ${
-                confirmationResult ? 'text-slate-900' : 'text-slate-400'
+                otpStepActive ? 'text-slate-900' : 'text-slate-400'
               }`}>Verify OTP</span>
             </div>
           </div>
@@ -574,14 +657,14 @@ export default function LoginOTP() {
             <h2 className="text-2xl font-black text-slate-900 tracking-tight">
               {isPasswordResetMode
                 ? 'Reset Account Access'
-                : !confirmationResult
+                : !otpStepActive
                 ? 'Welcome to TaazaBites'
                 : 'Enter 6-Digit Code'}
             </h2>
             <p className="text-slate-500 text-xs font-semibold mt-1">
               {isPasswordResetMode
                 ? 'Enter your mobile number or email address to recover your password.'
-                : !confirmationResult 
+                : !otpStepActive 
                 ? 'Enter your 10-digit mobile number to log in or create an account.' 
                 : `We sent a security verification code to +91 ${phoneNumber}.`}
             </p>
@@ -706,7 +789,7 @@ export default function LoginOTP() {
                   </>
                 )}
               </motion.div>
-            ) : !confirmationResult ? (
+            ) : !otpStepActive ? (
               <motion.div
                 key="step-phone"
                 initial={{ opacity: 0, x: -20 }}

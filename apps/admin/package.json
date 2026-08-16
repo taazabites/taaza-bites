@@ -55,5 +55,11 @@
     "tsx": "^4.23.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
+  },
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "^0.28.1",
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.1.14",
+    "lightningcss-linux-x64-gnu": "^1.30.1"
   }
 }

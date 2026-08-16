@@ -1,6 +1,7 @@
 import { 
   RecaptchaVerifier, 
   signInWithPhoneNumber, 
+  signInWithCustomToken,
   signOut, 
   onAuthStateChanged,
   GoogleAuthProvider,
@@ -64,6 +65,10 @@ export const signInWithPhone = async (phoneNumber: string, appVerifier: any): Pr
     console.error('Error signing in with phone:', error);
     throw error;
   }
+};
+
+export const signInWithAirtelCustomToken = async (customToken: string) => {
+  return signInWithCustomToken(auth, customToken);
 };
 
 export const logOut = async () => {

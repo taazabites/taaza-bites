@@ -1,7 +1,5 @@
 # Firebase App Hosting — admin
 # Console root directory: apps/admin
-#
-# No package-lock.json: Cloud Build uses platform-correct `npm install`.
 
 runConfig:
   minInstances: 0
@@ -11,7 +9,7 @@ runConfig:
   memoryMiB: 1024
 
 scripts:
-  buildCommand: npm run build
+  buildCommand: rm -rf node_modules && npm install && npm run build
   runCommand: node dist/server.cjs
 
 outputFiles:

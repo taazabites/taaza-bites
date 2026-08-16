@@ -40,5 +40,11 @@
   },
   "devDependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2"
+  },
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "^0.28.1",
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.1.14",
+    "lightningcss-linux-x64-gnu": "^1.30.1"
   }
 }

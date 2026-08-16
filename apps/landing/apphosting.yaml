@@ -1,8 +1,5 @@
 # Firebase App Hosting — landing
 # Console root directory: apps/landing
-#
-# No package-lock.json in this app: Cloud Build uses `npm install` (not `npm ci`),
-# which correctly installs Linux native optional deps (rollup, lightningcss, etc.).
 
 runConfig:
   minInstances: 0
@@ -12,7 +9,8 @@ runConfig:
   memoryMiB: 512
 
 scripts:
-  buildCommand: npm run build
+  # npm ci may skip some natives; reinstall so Linux optionalDeps are present
+  buildCommand: rm -rf node_modules && npm install && npm run build
   runCommand: node dist/server.cjs
 
 outputFiles:
