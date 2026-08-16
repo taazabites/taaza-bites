@@ -10,8 +10,8 @@ runConfig:
   memoryMiB: 512
 
 scripts:
-  # Reinstall after Cloud Build's npm ci — Windows lockfiles omit Linux Rollup optional deps
-  buildCommand: rm -rf node_modules && npm install && npm run build
+  # Windows-generated lockfiles omit Linux Rollup natives — wipe lock + reinstall on Cloud Build
+  buildCommand: rm -rf node_modules package-lock.json && npm install && npm install @rollup/rollup-linux-x64-gnu && npm run build
   runCommand: node dist/server.cjs
 
 outputFiles:
