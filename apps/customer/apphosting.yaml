@@ -10,7 +10,8 @@ runConfig:
   memoryMiB: 1024
 
 scripts:
-  buildCommand: npm install && npm run build
+  # Reinstall after Cloud Build's npm ci — Windows lockfiles omit Linux Rollup optional deps
+  buildCommand: rm -rf node_modules && npm install && npm run build
   runCommand: node dist/server.cjs
 
 outputFiles:

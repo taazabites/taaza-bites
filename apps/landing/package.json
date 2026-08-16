@@ -40,5 +40,8 @@
   },
   "devDependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.52.3"
   }
 }
