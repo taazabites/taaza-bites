@@ -1,0 +1,26 @@
+# Firebase App Hosting — admin
+# Console root directory: apps/admin
+# Docs: https://firebase.google.com/docs/app-hosting/configure
+
+runConfig:
+  minInstances: 0
+  maxInstances: 10
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 1024
+
+scripts:
+  buildCommand: npm install && npm run build
+  runCommand: node dist/server.cjs
+
+outputFiles:
+  serverApp:
+    include:
+      - dist
+
+env:
+  # Serve admin UI at domain root on App Hosting (not /admin/)
+  - variable: VITE_BASE
+    value: /
+    availability:
+      - BUILD
