@@ -15,9 +15,22 @@
     "build:landing": "npm run build -w @taazabites/landing",
     "build:admin": "npm run build -w @taazabites/admin",
     "build:customer": "npm run build -w @taazabites/customer",
-    "build:delivery": "npm run build -w @taazabites/delivery"
+    "build:delivery": "npm run build -w @taazabites/delivery",
+    "build:landing:web": "npm exec -w @taazabites/landing -- vite build",
+    "build:admin:web": "npm exec -w @taazabites/admin -- vite build",
+    "build:customer:web": "npm exec -w @taazabites/customer -- vite build",
+    "build:delivery:web": "npm exec -w @taazabites/delivery -- vite build",
+    "assemble:hosting": "node scripts/assemble-hosting.mjs",
+    "build:hosting": "npm run build:landing:web && npm run build:customer:web && npm run build:admin:web && npm run build:delivery:web && npm run assemble:hosting",
+    "firebase": "npx --yes firebase-tools@13",
+    "deploy:hosting": "npm run build:hosting && npm run firebase -- deploy --only hosting --project gen-lang-client-0684462293",
+    "deploy:landing": "npm run build:landing:web && npm run firebase -- deploy --only hosting --project gen-lang-client-0684462293",
+    "deploy:sites": "npm run build:hosting && npm run firebase -- deploy --only hosting --project gen-lang-client-0684462293"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "firebase-tools": "^13.35.1"
   }
 }

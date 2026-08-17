@@ -1,5 +1,5 @@
 # Firebase App Hosting — customer
-# Console root directory: apps/customer
+# Firebase Console → App Hosting → Backend → Root directory: apps/customer
 
 runConfig:
   minInstances: 0
@@ -9,7 +9,8 @@ runConfig:
   memoryMiB: 1024
 
 scripts:
-  buildCommand: rm -rf node_modules && npm install && npm run build
+  # Monorepo: install from repo root, build this workspace package
+  buildCommand: cd ../.. && npm ci && npm run build -w @taazabites/customer
   runCommand: node dist/server.cjs
 
 outputFiles:
