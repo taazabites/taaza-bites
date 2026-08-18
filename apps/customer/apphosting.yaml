@@ -9,9 +9,10 @@ runConfig:
   memoryMiB: 1024
 
 scripts:
-  # Monorepo: install from repo root (workspace lockfile), then copy runtime
-  # node_modules into this app. dist/server.cjs is built with --packages=external.
-  buildCommand: cd ../.. && npm ci && npm run build -w @taazabites/customer && mkdir -p apps/customer/node_modules && cp -a node_modules/. apps/customer/node_modules/
+  # Nested install places this workspace's runtime deps in apps/customer/node_modules
+  # (npm otherwise hoists packages such as compression to the repo root, which
+  # outputFiles cannot retain). dist/server.cjs is built with --packages=external.
+  buildCommand: cd ../.. && npm ci --install-strategy=nested && npm run build -w @taazabites/customer
   runCommand: node dist/server.cjs
 
 outputFiles:
