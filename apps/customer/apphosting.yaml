@@ -9,14 +9,16 @@ runConfig:
   memoryMiB: 1024
 
 scripts:
-  # Monorepo: install from repo root, build this workspace package
-  buildCommand: cd ../.. && npm ci && npm run build -w @taazabites/customer
+  # Monorepo: install from repo root (workspace lockfile), then copy runtime
+  # node_modules into this app. dist/server.cjs is built with --packages=external.
+  buildCommand: cd ../.. && npm ci && npm run build -w @taazabites/customer && mkdir -p apps/customer/node_modules && cp -a node_modules/. apps/customer/node_modules/
   runCommand: node dist/server.cjs
 
 outputFiles:
   serverApp:
     include:
       - dist
+      - node_modules
 
 env:
   - variable: VITE_BASE
