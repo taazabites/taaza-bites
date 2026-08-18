@@ -23,3 +23,7 @@ env:
     value: /
     availability:
       - BUILD
+  - variable: FIRESTORE_DATABASE_ID
+    value: ai-studio-taazabitessubscr-4d42449d-94e2-49b8-84ea-c7c481d0d5f9
+    availability:
+      - RUNTIME
