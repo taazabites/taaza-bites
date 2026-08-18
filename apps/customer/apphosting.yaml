@@ -9,10 +9,13 @@ runConfig:
   memoryMiB: 1024
 
 scripts:
-  # Nested install places this workspace's runtime deps in apps/customer/node_modules
-  # (npm otherwise hoists packages such as compression to the repo root, which
-  # outputFiles cannot retain). dist/server.cjs is built with --packages=external.
-  buildCommand: cd ../.. && npm ci --install-strategy=nested && npm run build -w @taazabites/customer
+  buildCommand: >-
+    cd ../.. &&
+    npm ci &&
+    npm run build -w @taazabites/customer &&
+    cd apps/customer &&
+    npm install --omit=dev --install-strategy=nested &&
+    node -e "console.log('compression:', require.resolve('compression')); console.log('express:', require.resolve('express')); console.log('dotenv:', require.resolve('dotenv')); console.log('firebase-admin:', require.resolve('firebase-admin'))"
   runCommand: node dist/server.cjs
 
 outputFiles:
