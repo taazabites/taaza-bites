@@ -13,9 +13,8 @@ scripts:
     cd ../.. &&
     npm ci &&
     npm run build -w @taazabites/customer &&
-    cd apps/customer &&
-    npm install --omit=dev --install-strategy=nested &&
-    node -e "console.log('compression:', require.resolve('compression')); console.log('express:', require.resolve('express')); console.log('dotenv:', require.resolve('dotenv')); console.log('firebase-admin:', require.resolve('firebase-admin'))"
+    npm install --prefix apps/customer --omit=dev --workspaces=false --install-strategy=nested --no-package-lock &&
+    node -e "console.log('compression:', require.resolve('./apps/customer/node_modules/compression')); console.log('express:', require.resolve('./apps/customer/node_modules/express')); console.log('dotenv:', require.resolve('./apps/customer/node_modules/dotenv')); console.log('firebase-admin:', require.resolve('./apps/customer/node_modules/firebase-admin'))"
   runCommand: node dist/server.cjs
 
 outputFiles:
